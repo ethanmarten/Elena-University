@@ -3,7 +3,7 @@ import smtplib
 import random
 import json
 import os
-import google.generativeai as genai
+from groq import Groq
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -16,17 +16,12 @@ from email.message import EmailMessage
 from streamlit_cookies_manager import EncryptedCookieManager
 import time
 
+# إعداد Groq باستخدام الـ Secrets
 try:
-    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    
-    # التعديل هون: نحدد الإصدار المستقر v1 عشان نحل مشكلة الـ 404
-    genai.configure(api_key=GEMINI_API_KEY, transport='grpc') 
-    
-    # نستخدم الاسم الأساسي للموديل
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    client = Groq(api_key=GROQ_API_KEY)
 except KeyError:
-    st.error("خطأ: مفتاح GEMINI_API_KEY غير موجود في الـ Secrets!")
+    st.error("خطأ: مفتاح GROQ_API_KEY غير موجود في الـ Secrets!")
     st.stop()
 
 cookies = EncryptedCookieManager(prefix="elena/", password="EM2006_secret_key")
@@ -452,31 +447,43 @@ with tabs[2]:
 
 # --- 4. الشات مع إيلينا ---
 with tabs[3]:
-    st.caption("🤖 إيلينا في وضع الذكاء الأكاديمي المتطور")
+    st.caption("🤖 إيلينا في وضع الذكاء الخارق (Llama 3)")
     
-    if chat_input := st.chat_input("اسأل إيلينا..."):
-        # 1. عرض رسالة المستخدم
-        with st.chat_message("user"):
-            st.write(chat_input)
-            
-        # 2. التأكد من وجود جلسة شات (الحماية من الـ AttributeError)
-        if "chat_session" not in st.session_state:
-            try:
-                # بنستخدم الـ model اللي عرفناه في أول الملف فوق
-                st.session_state.chat_session = model.start_chat(history=[])
-            except NameError:
-                st.error("خطأ: لم يتم تعريف 'model' في بداية الملف.")
-                st.stop()
+    # التأكد من وجود سجل المحادثة
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-        # 3. عرض رد إيلينا مع حماية من الأخطاء
+    # عرض الرسائل السابقة
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if chat_input := st.chat_input("اسأل إيلينا..."):
+        # 1. عرض وحفظ رسالة المستخدم
+        st.session_state.messages.append({"role": "user", "content": chat_input})
+        with st.chat_message("user"):
+            st.markdown(chat_input)
+
+        # 2. طلب الرد من Groq
         with st.chat_message("assistant"):
             try:
-                with st.spinner("إيلينا بتفكر... 🤔"):
-                    response = st.session_state.chat_session.send_message(chat_input)
-                    st.write(response.text)
+                with st.spinner("إيلينا بتكتب... ✍️"):
+                    chat_completion = client.chat.completions.create(
+                        # موديل Llama 3 70B هو الأقوى ومجاني حالياً على Groq
+                        model="llama-3.3-70b-versatile", 
+                        messages=[
+                            {"role": "system", "content": "أنت إيلينا، مساعدة أكاديمية لطلاب الجامعة. أجيبي بالعربية بأسلوب ذكي وودود."},
+                            *st.session_state.messages
+                        ],
+                    )
+                    response_text = chat_completion.choices[0].message.content
+                    st.markdown(response_text)
+                    
+                    # حفظ رد المساعد في السجل
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
             except Exception as e:
-                st.error(f"عذراً إيثان، صار خطأ في الاتصال: {e}")
-
+                st.error(f"عذراً إيثان، صار خطأ في اتصال Groq: {e}")
+                
 # --- 5. لوحة التحكم (المطور فقط) ---
 with tabs[4]:
     # 1. الفحص الرئيسي: هل المستخدم هو المطور (إيثان)؟
@@ -653,6 +660,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
