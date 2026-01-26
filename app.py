@@ -285,18 +285,30 @@ with tabs[4]:
     if st.session_state.get("user_role") == "developer":
         role_name = "إيثان"
         st.subheader(f"🛠️ لوحة تحكم المطور: {role_name}")
-        db_admin = load_db()
+        
+        # قراءة قاعدة البيانات
+        db = load_db()
+        
         st.write("👥 إحصائيات المستخدمين:")
-        st.json(db_admin)
+        st.json(db)
+        
         st.markdown("---")
-        st.write(f"🔑 الأكواد المتاحة في قاعدة البيانات: `{db['valid_codes']}`")
-        new_c = st.text_input("إضافة كود بريميوم جديد:")
+        
+        # التأكد من وجود مفتاح الأكواد في الملف
+        if "valid_codes" not in db:
+            db["valid_codes"] = []
+            save_db(db)
+
+        current_codes = db.get("valid_codes", [])
+        st.write(f"🔑 الأكواد المتاحة في قاعدة البيانات: `{current_codes}`")
+        
+        new_c = st.text_input("إضافة كود بريميوم جديد:", key="admin_final_input")
         if st.button("حفظ الكود في قاعدة البيانات ✅"):
             if new_c:
                 if new_c not in db["valid_codes"]:
                     db["valid_codes"].append(new_c)
-                    save_db(db) # حفظ دائم في ملف الـ JSON
-                    st.success(f"تم حفظ الكود [{new_c}] بنجاح لجميع المستخدمين!")
+                    save_db(db)
+                    st.success(f"تم حفظ الكود [{new_c}] بنجاح!")
                     st.rerun()
                 else:
                     st.warning("هذا الكود موجود مسبقاً!")
@@ -317,6 +329,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
