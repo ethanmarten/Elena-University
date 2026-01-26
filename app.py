@@ -63,14 +63,21 @@ st.markdown("""
 
 def load_db():
     if not os.path.exists("users_db.json"):
-        return {}
+        with open("users_db.json", "w") as f:
+            json.dump({}, f)
     with open("users_db.json", "r") as f:
-        return json.load(f)
-# --- 3. التعرف التلقائي على المستخدم من الكوكيز ---
-if "username" in cookies and cookies["username"] and not st.session_state.get("is_logged_in"):
+        try:
+            return json.load(f)
+        except:
+            return {}
+
+def save_db(db):
+    with open("users_db.json", "w") as f:
+        json.dump(db, f, indent=4)
+# --- 3. التعرف التلقائي (هاد اللي كان بيعمل NameError) ---
+if "username" in cookies and cookies["username"] != "" and not st.session_state.get("is_logged_in"):
     saved_user = cookies["username"]
-    if saved_user.strip() != "":
-        db = load_db()
+    db = load_db() # هلقيت البرنامج شايفها 100%
     
     # إذا كان المستخدم هو المطور (إيثان)
     if saved_user == "ethan":
@@ -577,6 +584,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
