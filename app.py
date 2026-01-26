@@ -188,13 +188,6 @@ if not st.session_state.is_logged_in:
 # --- 5. الواجهة الرئيسية ---
 badge = '<span class="prime-badge">PRIME 👑</span>' if st.session_state.user_status == "Prime" else ""
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
-بالظبط يا إيثان، تماماً تحت هادي الأسطر. المكان هاد هو "عقل" الصفحة اللي بيفحص مين المستخدم وقديش مسموح له يشوف قبل ما يعرض له التبويبات (Tabs).
-
-عشان يشتغل النظام صح، لازم نربط حالة المستخدم بملف الـ JSON اللي عملناه. إليك الكود جاهز للنسخ واللصق في هذا المكان:
-
-Python
-
-# --- التعديل تحت Elena Student AI مباشرة ---
 
 db = load_db()
 current_u = st.session_state.get("username", "user")
@@ -306,5 +299,6 @@ with st.sidebar:
                 st.session_state.user_status = "Prime"
                 st.session_state.IF_VALID_CODES.remove(c_in) # استخدام لمرة واحدة
                 st.rerun()
+
 
 
