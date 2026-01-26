@@ -156,49 +156,55 @@ if not st.session_state.is_logged_in:
         tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 تسجيل جديد"])
         db = load_db()
 
-      with tab_login:
-    u = st.text_input("اسم المستخدم", key="l_u")
-    p = st.text_input("كلمة السر", type="password", key="l_p")
-    
-    uid_input = st.text_input("الرقم الجامعي (للمزامنة)", key="l_uid")
-    upass_input = st.text_input("باسورد الجامعة (للمزامنة)", type="password", key="l_upass")
-
-    col_in, col_forgot = st.columns(2)
-    
-    if col_in.button("دخول للنظام", use_container_width=True):
-        # 1. حالة المطور (إيثان)
-        if u == "ethan" and p == "EM2006":
-            # حفظ الكوكي للمطور
-            cookies["username"] = "ethan"
-            cookies.save()
-            
-            st.session_state.update({
-                "is_logged_in": True, 
-                "user_role": "developer", 
-                "user_status": "Prime", 
-                "username": "Ethan",
-                "u_id": uid_input,
-                "u_pass": upass_input
-            })
-            st.rerun()
+     # --- 4. واجهة تسجيل الدخول المطورة ---
+if not st.session_state.get("is_logged_in"):
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        st.markdown("<h1 style='color: #FFD700;'>👑 Elena AI Portal</h1>", unsafe_allow_html=True)
         
-        # 2. حالة الطالب العادي
-        elif u in db and db[u]['password'] == p:
-            # حفظ اسم المستخدم في الكوكيز
-            cookies["username"] = u
-            cookies.save()
+        tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 تسجيل جديد"])
+        db = load_db()
+
+        with tab_login:
+            u = st.text_input("اسم المستخدم", key="l_u")
+            p = st.text_input("كلمة السر", type="password", key="l_p")
             
-            st.session_state.update({
-                "is_logged_in": True, 
-                "user_role": "user", 
-                "user_status": db[u]['status'], 
-                "username": u,
-                "u_id": uid_input,
-                "u_pass": upass_input
-            })
-            st.rerun()
-        else: 
-            st.error("بيانات خاطئة!")
+            uid_input = st.text_input("الرقم الجامعي (للمزامنة)", key="l_uid")
+            upass_input = st.text_input("باسورد الجامعة (للمزامنة)", type="password", key="l_upass")
+
+            col_in, col_forgot = st.columns(2)
+            
+            if col_in.button("دخول للنظام", use_container_width=True):
+                # 1. حالة المطور (إيثان)
+                if u == "ethan" and p == "EM2006":
+                    cookies["username"] = "ethan"
+                    cookies.save()
+                    st.session_state.update({
+                        "is_logged_in": True, 
+                        "user_role": "developer", 
+                        "user_status": "Prime", 
+                        "username": "Ethan",
+                        "u_id": uid_input,
+                        "u_pass": upass_input
+                    })
+                    st.rerun()
+                
+                # 2. حالة الطالب العادي
+                elif u in db and db[u]['password'] == p:
+                    cookies["username"] = u
+                    cookies.save()
+                    st.session_state.update({
+                        "is_logged_in": True, 
+                        "user_role": "user", 
+                        "user_status": db[u]['status'], 
+                        "username": u,
+                        "u_id": uid_input,
+                        "u_pass": upass_input
+                    })
+                    st.rerun()
+                else: 
+                    st.error("بيانات خاطئة!")
 
             if col_forgot.button("نسيت كلمة السر؟", use_container_width=True):
                 st.session_state.show_reset = True
@@ -567,6 +573,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
