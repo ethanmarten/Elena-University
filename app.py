@@ -16,6 +16,9 @@ from email.message import EmailMessage
 from streamlit_cookies_manager import EncryptedCookieManager
 import time
 
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
 cookies = EncryptedCookieManager(prefix="elena/", password="EM2006_secret_key")
 if not cookies.ready():
     st.stop()
@@ -614,6 +617,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
