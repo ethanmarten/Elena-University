@@ -160,9 +160,9 @@ if check_login():
             col_pay, col_code = st.columns(2)
             with col_pay:
                 st.write("### 💳 طرق الدفع المحلية")
-                st.write("- **محفظة جوال باي:** `059XXXXXXX`")
-                st.write("- **بنك فلسطين:** `1234567` (إيهاب الحايك)")
-                st.write("- **تواصل واتساب:** [اضغط هنا للترقية](https://wa.me/yournumber)")
+                st.write("- **محفظة جوال باي:** `0594820775`")
+                st.write("- **بنك فلسطين:** `1701577` (إيهاب الحايك)")
+                st.write("- **تواصل واتساب:** [اضغط هنا للترقية](https://wa.me/+972594820775)")
             with col_code:
                 st.write("### 🔑 تفعيل بكود")
                 code_in = st.text_input("أدخل كود الاشتراك:")
@@ -217,3 +217,4 @@ if check_login():
             with st.chat_message("assistant"):
                 response = st.session_state.chat_session.send_message(chat_input)
                 st.write(response.text)
+
