@@ -443,20 +443,49 @@ with tabs[2]:
                     else: st.error(f"خطأ: {res.get('error', 'لا يمكن الوصول للدرجات')}")
             else: st.warning("أدخل بيانات الجامعة أولاً.")
     else: 
-        st.error("رجاءً قم بعمل 'Sync Now' من القائمة الجانبية أولاً.")
+            st.error("رجاءً قم بعمل 'Sync Now' من القائمة الجانبية أولاً.")
 
-# 4. Ask Elena (تصحيح المسافات والخطأ)
+# --- 4. الشات مع إيلينا ---
 with tabs[3]:
     st.caption("🤖 إيلينا في وضع الذكاء الأكاديمي المتطور")
+    
     if chat_input := st.chat_input("اسأل إيلينا..."):
+        # 1. عرض رسالة المستخدم
         with st.chat_message("user"):
             st.write(chat_input)
-        with st.chat_message("assistant"):
-            response = st.session_state.chat_session.send_message(chat_input)
-            st.write(response.text)
+            
+        # 2. التأكد من وجود جلسة شات (الحماية من الـ AttributeError)
+        if "chat_session" not in st.session_state:
+            try:
+                # بنستخدم الـ model اللي عرفناه في أول الملف فوق
+                st.session_state.chat_session = model.start_chat(history=[])
+            except NameError:
+                st.error("خطأ: لم يتم تعريف 'model' في بداية الملف.")
+                st.stop()
 
+        # 3. عرض رد إيلينا مع حماية من الأخطاء
+        with st.chat_message("assistant"):
+            try:
+                with st.spinner("إيلينا بتفكر... 🤔"):
+                    response = st.session_state.chat_session.send_message(chat_input)
+                    st.write(response.text)
+            except Exception as e:
+                st.error(f"عذراً إيثان، صار خطأ في الاتصال: {e}")
+
+# --- 5. لوحة التحكم (المطور فقط) ---
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
+        st.subheader("🛠️ لوحة تحكم المطور")
+        # هون بتقدر تحط كود الـ Activity Log اللي عملناه قبل شوي
+        if st.button("📊 عرض سجل النشاط"):
+            if os.path.exists("activity_log.json"):
+                with open("activity_log.json", "r") as f:
+                    logs = json.load(f)
+                st.table(logs[-10:]) # عرض آخر 10 عمليات دخول
+            else:
+                st.info("لا يوجد سجلات حالياً.")
+    else:
+        st.warning("هذا التبويب مخصص للمطور فقط! 🚫")
         role_name = "إيثان"
         st.subheader(f"🛠️ لوحة تحكم المطور: {role_name}")
         
@@ -622,6 +651,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
