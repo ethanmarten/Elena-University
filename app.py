@@ -97,40 +97,43 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
     except Exception as e: return {"error": str(e)}
     finally: driver.quit()
 
-# --- 4. واجهة تسجيل الدخول المطورة ---
-with tab_login:
+if not st.session_state.is_logged_in:
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
+        st.markdown("<h1 style='color: #FFD700;'>👑 Elena AI Portal</h1>", unsafe_allow_html=True)
+        
+        tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 تسجيل جديد"])
+        db = load_db()
+
+        with tab_login:
             u = st.text_input("اسم المستخدم", key="l_u")
             p = st.text_input("كلمة السر", type="password", key="l_p")
             
-            # --- إضافة خانات بيانات الجامعة في صفحة الدخول (اختياري بس أفضل للمزامنة) ---
-            # إذا كنت بدك الطالب يدخلهم أول مرة بس ويتحفظوا:
             uid_input = st.text_input("الرقم الجامعي (للمزامنة)", key="l_uid")
             upass_input = st.text_input("باسورد الجامعة (للمزامنة)", type="password", key="l_upass")
 
             col_in, col_forgot = st.columns(2)
             
             if col_in.button("دخول للنظام", use_container_width=True):
-                # 1. حالة المطور (إيثان)
                 if u == "ethan" and p == "EM2006":
                     st.session_state.update({
                         "is_logged_in": True, 
                         "user_role": "developer", 
                         "user_status": "Prime", 
                         "username": "Ethan",
-                        "u_id": uid_input,    # حفظ الرقم الجامعي
-                        "u_pass": upass_input # حفظ كلمة السر
+                        "u_id": uid_input,
+                        "u_pass": upass_input
                     })
                     st.rerun()
-                
-                # 2. حالة الطالب العادي
                 elif u in db and db[u]['password'] == p:
                     st.session_state.update({
                         "is_logged_in": True, 
                         "user_role": "user", 
                         "user_status": db[u]['status'], 
                         "username": u,
-                        "u_id": uid_input,    # حفظ الرقم الجامعي
-                        "u_pass": upass_input # حفظ كلمة السر
+                        "u_id": uid_input,
+                        "u_pass": upass_input
                     })
                     st.rerun()
                 else: 
@@ -161,10 +164,14 @@ with tab_login:
                             save_db(db)
                             st.success("تم التحديث!")
                             del st.session_state.show_reset
+                            st.rerun()
                         else: st.error("الكود خطأ")
 
         with tab_signup:
-            nu, ne, np = st.text_input("اسم مستخدم"), st.text_input("Gmail"), st.text_input("كلمة سر", type="password")
+            nu = st.text_input("اسم مستخدم", key="s_u")
+            ne = st.text_input("Gmail", key="s_e")
+            np = st.text_input("كلمة سر", type="password", key="s_p")
+            
             if st.button("إرسال كود التحقق 📧"):
                 if nu in db: st.error("موجود مسبقاً")
                 elif not ne.endswith("@gmail.com"): st.warning("استخدم Gmail")
@@ -175,7 +182,7 @@ with tab_login:
                         st.success("تفقد إيميلك")
             
             if "temp_otp" in st.session_state:
-                otp_in = st.text_input("أدخل الكود:")
+                otp_in = st.text_input("أدخل الكود التحقق:")
                 if st.button("تأكيد الحساب"):
                     if otp_in == str(st.session_state.temp_otp):
                         d = st.session_state.temp_data
@@ -183,6 +190,10 @@ with tab_login:
                         save_db(db)
                         st.success("تم! سجل دخولك الآن.")
                         del st.session_state.temp_otp
+                        st.rerun()
+                    else:
+                        st.error("الكود غير صحيح")
+
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
@@ -495,6 +506,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
