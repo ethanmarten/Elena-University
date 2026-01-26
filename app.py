@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 from streamlit_cookies_manager import EncryptedCookieManager
 import time
+import pytz
 
 # إعداد Groq باستخدام الـ Secrets
 try:
@@ -84,8 +85,10 @@ def summarize_content(text_to_analyze, type="ملف"):
     
 # --- الدالة السحرية لحل مشكلة الوقت (فلسطين UTC+2) ---
 def get_local_time():
-    # بنجيب توقيت السيرفر العالمي وبنزود ساعتين عشان يطابق ساعتك في غزة
-    return datetime.utcnow() + timedelta(hours=2)
+    # بنحدد المنطقة الزمنية لغزة/القدس
+    local_tz = pytz.timezone('Asia/Gaza')
+    # بنجيب الوقت الحالي بناءً على المنطقة
+    return datetime.now(local_tz)
 # --- 1. إعدادات الصفحة والتصميم ---
 # --- 1. إعداد الصفحة والتصميم (أول شيء في الكود) ---
 st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
@@ -491,47 +494,66 @@ with tabs[0]:
     else:
         st.warning("⚠️ لا توجد بيانات حالياً. الرجاء جلب البيانات من موقع الجامعة أولاً.")
 # --- داخل تبويب المساقات ---
-with tabs[1]: 
-    # لازم يكون فيه فراغ (Tab) قبل كل الأسطر اللي تحت
-    st.subheader("📖 مستكشف محتوى المساقات")
+with tabs[1]:
+    st.subheader("📖 مستكشف محتوى المساقات الرسمية")
     
-    # قائمة المواد
-    course_to_scan = st.selectbox("اختر المادة المراد استكشافها:", ["برمجة 1", "إحصاء", "تفاضل"])
-    
-    if st.button(f"افتح محتويات {course_to_scan}"):
-        with st.spinner("جاري جرد الملفات والفيديوهات من المودل..."):
-            # الرابط الفعلي للمادة
-            course_url = "https://moodle.iugaza.edu.ps/course/view.php?id=123" 
-            links = get_course_content(course_url)
-            st.session_state.current_course_links = links
+    # زر لجلب المواد الحقيقية من المودل
+    if st.button("🔄 تحديث قائمة موادي من الجامعة"):
+        with st.spinner("إيلينا تتواصل مع المودل لجلب موادك..."):
+            try:
+                # سحب المواد باستخدام السيلينيوم
+                driver.get("https://moodle.iugaza.edu.ps/my/#")
+                time.sleep(3)
+                course_elements = driver.find_elements(By.CSS_SELECTOR, "h4.multiline a") # كلاس أسماء المواد في مودل IUG
+                
+                if not course_elements:
+                    course_elements = driver.find_elements(By.CSS_SELECTOR, ".coursename a")
 
+                real_courses = {elem.text: elem.get_attribute("href") for elem in course_elements}
+                st.session_state.my_real_courses = real_courses
+                st.success(f"تم العثور على {len(real_courses)} مواد مسجلة!")
+            except Exception as e:
+                st.error(f"فشل جلب المواد: {e}")
+
+    # إذا كانت المواد مسحوبة، نعرضها في القائمة
+    if "my_real_courses" in st.session_state:
+        course_names = list(st.session_state.my_real_courses.keys())
+        selected_course = st.selectbox("اختر المادة المراد استكشافها:", course_names)
+        
+        if st.button(f"افتح محتويات {selected_course}"):
+            with st.spinner("جاري جرد الملفات..."):
+                course_url = st.session_state.my_real_courses[selected_course]
+                links = get_course_content(course_url)
+                st.session_state.current_course_links = links
+    else:
+        st.info("اضغط على الزر أعلاه لجلب موادك الرسمية من حسابك.")
+
+    # عرض الملفات للتحليل (نفس كودك السابق)
     if "current_course_links" in st.session_state:
         for link in st.session_state.current_course_links:
             col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"📄 {link['name']}")
+            with col1: st.write(f"📄 {link['name']}")
             with col2:
-                # الكود هون كمان لازم يكون مزاح لليمين
                 if st.button("حلل الآن", key=link['url']):
-                    with st.spinner("إيلينا تقرأ وتحلل الآن..."):
+                    with st.spinner("إيلينا تحلل المحتوى..."):
                         try:
+                            # 1. سحب النص من الملف (سواء PDF أو رابط)
                             if ".pdf" in link['url'] or "resource" in link['url']:
                                 import requests
                                 response = requests.get(link['url'])
                                 pdf_file = io.BytesIO(response.content)
-                                
                                 pdf_reader = PyPDF2.PdfReader(pdf_file)
                                 text = ""
                                 for page in pdf_reader.pages:
                                     text += page.extract_text()
                                 
-                                summary = summarize_content(text, "ملف محاضرة PDF")
-                                st.success("✅ اكتمل التلخيص! اذهب لـ 'Ask Elena' لمناقشته.")
+                                # 2. استدعاء دالة التلخيص (اللي بتخزن في st.session_state.last_summary)
+                                summary = summarize_content(text, "ملف PDF")
+                                st.success("✅ إيلينا قرأت الملف! اسألها عنه في الشات الآن.")
                                 st.markdown(summary)
-                                
                             else:
-                                st.info("تحليل الفيديو سيعتمد على الرابط حالياً...")
-                                summary = summarize_content(f"رابط فيديو للمادة: {link['url']}", "فيديو تعليمي")
+                                # للروابط الأخرى أو الفيديوهات
+                                summary = summarize_content(f"محتوى من الرابط: {link['url']}", "رابط تعليمي")
                                 st.markdown(summary)
                                 
                         except Exception as e:
@@ -541,61 +563,71 @@ with tabs[1]:
 with tabs[2]:
     st.subheader("📊 تحليل العلامات التفصيلي")
     
-    # 1. زر البدء (Trigger Selenium)
-    if st.button("🚀 ابدأ سحب وتحليل العلامات الآن", use_container_width=True):
-        with st.spinner("إيلينا بتدخل على ملفاتك الأكاديمية... انتظر قليلاً ⏳"):
+    if st.button("🚀 سحب درجاتي الحقيقية من المودل", use_container_width=True):
+        with st.spinner("إيلينا تجمع درجاتك الآن..."):
             try:
-                # ملاحظة: هان لازم تنادي دالة السيلينيوم اللي بتسحب العلامات 
-                # ونفترض إنها بتخزن النتيجة في st.session_state.all_grades
-                # (سأضع لك مثالاً لبيانات تجريبية لنرى كيف سيحللها Groq)
+                # هنا السيلينيوم يذهب لصفحة الدرجات
+                driver.get("https://moodle.iugaza.edu.ps/grade/report/overview/index.php")
+                time.sleep(3)
                 
-                all_grades = st.session_state.get("all_grades", {
-                    "برمجة 1": {"كويزات": 15, "واجبات": 18, "نصفي": 25, "المجموع": 58},
-                    "رياضيات منفصلة": {"كويزات": 10, "واجبات": 20, "نصفي": 20, "المجموع": 50}
-                })
-
-                st.write("✅ تم سحب علامات المواد التالية:")
-                for course in all_grades:
-                    st.write(f"🔹 {course}")
-
-                # 2. إرسال البيانات لـ Groq للتحليل
-                st.markdown("---")
-                st.write("🤖 **تحليل إيلينا الذكي:**")
+                # كود بسيط لسحب جدول الدرجات
+                rows = driver.find_elements(By.CSS_SELECTOR, "table#overview-grade tr")
+                actual_grades = {}
+                for row in rows[1:]: # تخطي الهيدر
+                    cols = row.find_elements(By.TAG_NAME, "td")
+                    if len(cols) >= 2:
+                        course_name = cols[0].text
+                        grade_val = cols[1].text
+                        actual_grades[course_name] = {"المجموع": grade_val}
                 
-                grades_context = str(all_grades)
-                prompt = f"""
-                هذه هي درجاتي التفصيلية في جميع المواد:
-                {grades_context}
-                
-                المطلوب منك:
-                1. تحليل أدائي في كل مادة على حدة (كويزات، واجبات، نصفي).
-                2. تحديد المادة التي أحتاج فيها لبذل مجهود أكبر لرفع المعدل.
-                3. تقديم نصيحة عملية لكل مادة (مثلاً: إذا كانت علامة الواجبات منخفضة، انصحني بالاهتمام بالتسليم).
-                4. توقع الدرجة التي أحتاجها في النهائي للحصول على 'امتياز' في كل مادة.
-                أجب بأسلوب محفز وذكي.
-                """
-                
-                analysis = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": "أنت مستشار أكاديمي خبير واسمك إيلينا."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-
-                # --- التعديل الجوهري هان ---
-                # حفظ نص التحليل في الذاكرة المركزية عشان يظهر في Ask Elena
-                st.session_state.grades_analysis_result = analysis.choices[0].message.content
-                
-                # عرض النتيجة فوراً للطالب
-                st.success(st.session_state.grades_analysis_result)
-                
+                st.session_state.all_grades = actual_grades
+                st.success("تم سحب درجاتك الرسمية!")
             except Exception as e:
-                st.error(f"حدث خطأ أثناء سحب العلامات: {e}")
+                st.error(f"لم نتمكن من الوصول للدرجات تلقائياً: {e}")
 
-    # 3. عرض جدول العلامات إذا كان موجوداً
-    if "all_grades" in st.session_state:
+    # التحليل الذكي للبيانات المسحوبة
+    if "all_grades" in st.session_state and st.session_state.all_grades:
+        st.write("✅ درجاتك المسجلة حالياً:")
         st.dataframe(st.session_state.all_grades)
+        
+        if st.button("🤖 اطلبي من إيلينا تحليل هذه الدرجات"):
+            # كود إرسال st.session_state.all_grades لـ Groq كما فعلنا سابقاً
+           with st.spinner("إيلينا تحلل درجاتك الحقيقية الآن..."):
+                try:
+                    # تحويل قاموس الدرجات لنص يفهمه الذكاء الاصطناعي
+                    grades_text = ""
+                    for course, data in st.session_state.all_grades.items():
+                        grades_text += f"- {course}: {data.get('المجموع', 'غير رصود')}\n"
+                    
+                    prompt = f"""
+                    هذه هي درجاتي الرسمية من موقع الجامعة:
+                    {grades_text}
+                    
+                    المطلوب منك كإيلينا:
+                    1. تحليل سريع لمستواي بناءً على هذه الدرجات.
+                    2. أي مادة هي الأضعف وتحتاج تركيز؟
+                    3. نصيحة أخيرة للنهائي.
+                    أجيب بأسلوب ذكي وقصير.
+                    """
+                    
+                    response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": "أنتِ إيلينا، مستشارة أكاديمية ذكية."},
+                            {"role": "user", "content": prompt}
+                        ]
+                    )
+                    
+                    # حفظ النتيجة في الذاكرة عشان الشات
+                    st.session_state.grades_analysis_result = response.choices[0].message.content
+                    
+                    # عرض النتيجة
+                    st.markdown("---")
+                    st.success("📈 **تحليل إيلينا لدرجاتك الحقيقية:**")
+                    st.write(st.session_state.grades_analysis_result)
+                    
+                except Exception as e:
+                    st.error(f"فشل التحليل الذكي: {e}")
         
 # --- 4. الشات مع إيلينا ---
 with tabs[3]:
@@ -842,6 +874,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
