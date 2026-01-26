@@ -195,18 +195,18 @@ badge = '<span class="prime-badge">PRIME 👑</span>' if st.session_state.user_s
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
 # هيدر الترحيب (تأكد أن الأسطر تبدأ من بداية السطر تماماً بدون مسافات)
-# 1. تحديد الاسم (المطور إيثان أو طالب إيلينا)
+# كود الهيدر العلوي
+main_badge = "👑" if st.session_state.user_status == "Prime" else ""
+st.title(f"Elena Student AI {main_badge}")
+
+# --- كود الترحيب اللي بعته أنت (تحته مباشرة) ---
 role_name = "إيثان" if st.session_state.get("user_role") == "developer" else "طالب إيلينا"
 
-# 2. تحديد الـ Badge بناءً على الحالة الحالية
 if st.session_state.get("user_status") == "Prime":
-    # تاج ذهبي فخم للبريميوم
     badge = '<span style="background:#FFD700; color:black; padding:2px 10px; border-radius:10px; font-size:18px; margin-right:10px;">PRIME MEMBER 👑</span>'
 else:
-    # تاج بسيط للمستخدم العادي (بتقدر تخليه فاضي "" لو حابب)
     badge = '<span style="background:#f0f2f6; color:#666; padding:2px 10px; border-radius:10px; font-size:18px; margin-right:10px;">STANDARD 🎓</span>'
 
-# 3. عرض الترحيب النهائي
 st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
 
 # --- نافذة الاشتراك (Upgrade Section) ---
@@ -391,9 +391,10 @@ def get_local_time():
     return datetime.utcnow() + timedelta(hours=2)
 
 with st.sidebar:
-    # --- عرض تاريخ انتهاء الاشتراك بتنسيق لوني احترافي ---
+    # --- عرض تاريخ انتهاء الاشتراك بتنسيق لوني احترافي وتحكم تلقائي ---
     if st.session_state.get("user_status") == "Prime":
         db = load_db() 
+        current_u = st.session_state.get("username", "user")
         expire_str = db.get(current_u, {}).get("expire_at")
         
         if expire_str:
@@ -401,20 +402,29 @@ with st.sidebar:
                 dt_obj = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
                 pretty_date = dt_obj.strftime("%Y/%m/%d - %I:%M %p")
                 
-                # حساب الوقت المتبقي
+                # حساب الوقت المتبقي (UTC+2)
                 time_diff = dt_obj - get_local_time()
                 total_seconds = time_diff.total_seconds()
                 
                 if total_seconds > 0:
-                    # إذا متبقي أكثر من 24 ساعة (أخضر)
-                    if total_seconds > 86400: 
+                    # الحالة: لسا برايم ونشط
+                    if total_seconds > 86400: # أكثر من يوم (أخضر)
                         st.success(f"👑 **عضوية برايم نشطة**\n\n📅 ينتهي في: {pretty_date}")
-                    # إذا متبقي أقل من يوم (أصفر/برتقالي)
-                    else:
+                    else: # أقل من يوم (أصفر)
                         st.warning(f"⏳ **اشتراكك أوشك على الانتهاء!**\n\n📅 الموعد: {pretty_date}")
                 else:
-                    # إذا انتهى الوقت فعلياً (أحمر)
-                    st.error("⚠️ **انتهى الاشتراك!**\n\nيرجى التجديد للاستمرار بالميزات.")
+                    # الحالة: انتهى الوقت فعلياً (تنفيذ الإلغاء)
+                    db[current_u]["status"] = "Standard"
+                    if "expire_at" in db[current_u]:
+                        del db[current_u]["expire_at"]
+                    save_db(db)
+                    
+                    # تحديث حالة الجلسة فوراً
+                    st.session_state.user_status = "Standard"
+                    
+                    st.error("⚠️ **انتهى الاشتراك!**\n\nتم تحويل حسابك للوضع العادي.")
+                    # إعادة تحميل الصفحة ليختفي التاج الذهبي من الهيدر
+                    st.rerun() 
             except:
                 st.info(f"📅 ينتهي اشتراكك في: {expire_str}")
     
@@ -447,6 +457,7 @@ with st.sidebar:
                     st.error("فشلت المزامنة، تأكد من البيانات.")
         else:
             st.warning("يرجى إدخال الرقم الجامعي وكلمة المرور.")
+
 
 
 
