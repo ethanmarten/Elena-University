@@ -563,35 +563,43 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # --- 1. الـ Expander (لاحظ المحاذاة) ---
+    # --- 1. الـ Expander (تأكد من وجود 4 مسافات قبل with) ---
     with st.expander("⚙️ الإعدادات المتقدمة"):
         if st.button("🔴 تسجيل الخروج", use_container_width=True):
+            # 1. القوة الضاربة لمسح ذاكرة كروم
             st.components.v1.html(
                 """
                 <script>
                 document.cookie.split(";").forEach(function(c) { 
                     document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
                 });
+                localStorage.clear();
+                sessionStorage.clear();
+                window.parent.location.href = window.parent.location.origin + window.parent.location.pathname;
                 </script>
                 """,
                 height=0
             )
+            
+            # 2. مسح الكوكيز من جهة السيرفر
             cookies["username"] = ""
             if "username" in cookies:
                 del cookies["username"]
             cookies.save()
+            
+            # 3. تصفير الجلسة
             st.session_state.clear()
             st.session_state["is_logged_in"] = False
-            st.success("تم تسجيل الخروج بنجاح!")
-            time.sleep(0.5)
-            st.rerun()
+            
+            st.success("تم تسجيل الخروج...")
             st.stop()
 
-    # --- 2. كود المطور (لازم يكون برا الـ expander بس جوا السايدبار) ---
+    # --- 2. كود المطور (برا الـ expander وجوا السايدبار) ---
     if st.session_state.get("user_role") == "developer":
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
