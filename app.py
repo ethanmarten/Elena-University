@@ -591,7 +591,7 @@ with st.sidebar:
             st.session_state.clear()
             st.session_state["is_logged_in"] = False
             
-            st.success("تم تسجيل الخروج...")
+            st.success("تم تسجيل الخروج...(اعمل اعادة تحميل للصفحة)")
             st.stop()
 
     # --- 2. كود المطور (برا الـ expander وجوا السايدبار) ---
@@ -599,6 +599,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
