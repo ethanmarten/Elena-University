@@ -15,6 +15,10 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 import time
 
+# --- الدالة السحرية لحل مشكلة الوقت (فلسطين UTC+2) ---
+def get_local_time():
+    # بنجيب توقيت السيرفر العالمي وبنزود ساعتين عشان يطابق ساعتك في غزة
+    return datetime.utcnow() + timedelta(hours=2)
 # --- 1. إعدادات الصفحة والتصميم ---
 st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
 
@@ -459,6 +463,7 @@ with st.sidebar:
                     st.error("فشلت المزامنة، تأكد من البيانات.")
         else:
             st.warning("يرجى إدخال الرقم الجامعي وكلمة المرور.")
+
 
 
 
