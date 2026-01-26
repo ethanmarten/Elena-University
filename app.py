@@ -191,22 +191,33 @@ if st.session_state.user_status == "Standard":
             st.write("- **محفظة جوال باي:** `0594820775`")
             st.write("- **بنك فلسطين:** `1701577` (إيهاب الحايك)")
             st.write("- **تواصل واتساب:** [اضغط هنا للترقية](https://wa.me/+972594820775)")
+        
         with col_code:
             st.write("### 🔑 تفعيل بكود")
             code_in = st.text_input("أدخل كود الاشتراك:", key="unique_upgrade_key")
             if st.button("تفعيل الآن"):
-                valid_codes = st.session_state.get('IF_VALID_CODES', [])
+                # قراءة قاعدة البيانات للتأكد من الأكواد المحفوظة فعلياً
+                db = load_db()
+                valid_codes = db.get("valid_codes", []) # بنقرأ من الملف مش من الـ session
+                
                 if code_in in valid_codes:
+                    # 1. تحديث حالة المستخدم في الجلسة
                     st.session_state.user_status = "Prime"
-                    db = load_db()
-                    if st.session_state.username in db:
-                        db[st.session_state.username]["status"] = "Prime"
+                    
+                    # 2. تحديث الحالة في ملف الـ JSON
+                    curr_user = st.session_state.username
+                    if curr_user in db:
+                        db[curr_user]["status"] = "Prime"
+                        
+                        # 3. (حركة ذكية) مسح الكود من القائمة عشان ما يستخدمه حد تاني
+                        db["valid_codes"].remove(code_in)
+                        
                         save_db(db)
-                    st.success("تم التفعيل! أنت الآن مستخدم برايم.")
-                    time.sleep(1)
-                    st.rerun()
+                        st.success("تم التفعيل بنجاح! أنت الآن مستخدم بريميوم 👑")
+                        time.sleep(1)
+                        st.rerun()
                 else: 
-                    st.error("الكود غير صالح")
+                    st.error("❌ الكود غير صالح أو تم استخدامه مسبقاً")
                     
 # حماية الليمت
 if st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
@@ -329,6 +340,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
