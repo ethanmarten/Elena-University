@@ -557,21 +557,20 @@ with st.sidebar:
             st.warning("يرجى إدخال الرقم الجامعي وكلمة المرور.")
             
             st.markdown("---")
-    with st.expander("⚙️ الإعدادات المتقدمة"):
+  with st.expander("⚙️ الإعدادات المتقدمة"):
         if st.button("🔴 تسجيل الخروج", use_container_width=True):
-            # مسح بيانات الجلسة بالكامل
+            # 1. حذف الكوكيز من المتصفح (هاد السطر اللي كان ناقصك)
+            if "username" in cookies:
+                del cookies["username"]
+                cookies.save()  # ضروري جداً عشان المتصفح يحذفها فعلياً
+            
+            # 2. مسح بيانات الجلسة بالكامل
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             
             st.success("تم تسجيل الخروج بنجاح!")
             time.sleep(1)
             st.rerun()
-
-    # خيار مسح الكاش (للمطور)
-    if st.session_state.get("user_role") == "developer":
-        if st.button("🧹 Clear Cache", use_container_width=True):
-            st.cache_data.clear()
-            st.success("تم مسح الكاش!")
 
 
 
