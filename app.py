@@ -191,7 +191,7 @@ else:
     user_syncs = 0
 
 # 3. ثالث خطوة: رسم الهيدر والترحيب
-badge = '<span class="prime-badge">PRIME 👑</span>' if st.session_state.user_status == "Prime" else ""
+badge = '<span class="prime-badge">👑</span>' if st.session_state.user_status == "Prime" else ""
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
 # هيدر الترحيب (تأكد أن الأسطر تبدأ من بداية السطر تماماً بدون مسافات)
@@ -457,6 +457,7 @@ with st.sidebar:
                     st.error("فشلت المزامنة، تأكد من البيانات.")
         else:
             st.warning("يرجى إدخال الرقم الجامعي وكلمة المرور.")
+
 
 
 
