@@ -380,17 +380,32 @@ tabs = st.tabs(["📅 المخطط الذكي", "📚 المقررات", "📊 �
 with tabs[0]:
     if st.session_state.get("timeline_data"):
         if st.button("رتب لي جدول دراستي 📅"):
+            # --- حماية من الـ AttributeError ---
+            if "chat_session" not in st.session_state:
+                # تأكد أن 'model' معرف في بداية الملف، إذا كان اسمه مختلف غيره هون
+                try:
+                    st.session_state.chat_session = model.start_chat(history=[])
+                except NameError:
+                    st.error("خطأ: لم يتم تعريف نموذج الذكاء الاصطناعي (model) في بداية الملف.")
+                    st.stop()
+
             p = f"رتب المهام حسب الأولوية في جدول: {st.session_state.timeline_data}"
-            resp = st.session_state.chat_session.send_message(p)
-            st.write(resp.text)
+            
+            # عرض لودر بسيط عشان الطالب يعرف إنه البرنامج بيفكر
+            with st.spinner("جاري ترتيب جدولك الذكي..."):
+                try:
+                    resp = st.session_state.chat_session.send_message(p)
+                    st.success("تم ترتيب الجدول بنجاح!")
+                    st.markdown(resp.text)
+                except Exception as e:
+                    st.error(f"حدث خطأ أثناء التواصل مع إيلينا: {e}")
     else: 
         st.info("قم بالمزامنة أولاً من القائمة الجانبية")
-
 # 2. المقررات
 with tabs[1]:
     if st.session_state.get("courses"):
         course = st.selectbox("اختر المساق:", list(st.session_state.courses.keys()))
-        if st.button("سحب المصادر 🔍"):
+        if st.button("جاري الغوص في المصادر... 🏊‍♂️"):
             # التأكد من وجود البيانات قبل التشغيل
             uid = st.session_state.get("u_id")
             upass = st.session_state.get("u_pass")
@@ -599,6 +614,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
