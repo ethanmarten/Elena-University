@@ -177,7 +177,7 @@ if not st.session_state.is_logged_in:
         tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 إنشاء حساب"])
         db = load_db()
 
-        with tab_login:
+       with tab_login:
             u = st.text_input("اسم المستخدم", key="login_u")
             p = st.text_input("كلمة السر", type="password", key="login_p")
             
@@ -191,37 +191,49 @@ if not st.session_state.is_logged_in:
                     st.session_state.update({"is_logged_in": True, "user_role": "user", "user_status": db[u]['status'], "username": u})
                     st.rerun()
                 else:
-                    st.error("بيانات خاطئة!")
+                    st.error("بيانات خاطئة أو الحساب غير موجود")
 
+            # هذا الزر هو اللي بيظهر خيار الاستعادة
             if col_forgot.button("نسيت كلمة السر؟", use_container_width=True):
                 st.session_state.show_reset = True
 
+            # قسم الاستعادة - سيظهر فقط عند الضغط على الزر أعلاه
             if st.session_state.get("show_reset"):
                 st.markdown("---")
-                email_reset = st.text_input("أدخل إيميلك المسجل:")
-                if st.button("إرسال كود الاستعادة"):
-                    user_found = next((user for user, info in db.items() if info['email'] == email_reset), None)
+                st.info("استعادة كلمة المرور")
+                email_reset = st.text_input("أدخل إيميلك المسجل لدينا:", key="reset_mail_input")
+                
+                if st.button("إرسال كود التحقق 📧", key="send_reset_btn"):
+                    # البحث عن اليوزر المرتبط بهذا الإيميل
+                    user_found = next((user for user, info in db.items() if info.get('email') == email_reset), None)
+                    
                     if user_found:
                         otp = random.randint(1000, 9999)
                         if send_otp(email_reset, otp):
                             st.session_state.reset_otp = otp
                             st.session_state.reset_user = user_found
-                            st.success("أرسلنا كود لبريدك!")
-                        else: st.error("خطأ في الإرسال")
-                    else: st.error("الإيميل غير موجود")
-                
+                            st.success(f"تم إرسال كود الاستعادة إلى {email_reset}")
+                        else:
+                            st.error("فشل في إرسال البريد. تأكد من إعدادات السيرفر.")
+                    else:
+                        st.error("هذا الإيميل غير مرتبط بأي حساب مسجل.")
+
+                # إذا تم إرسال الكود، تظهر خانات التغيير
                 if "reset_otp" in st.session_state:
-                    code_in = st.text_input("أدخل كود التحقق:")
-                    new_p = st.text_input("كلمة السر الجديدة:", type="password")
-                    if st.button("تأكيد التغيير"):
+                    code_in = st.text_input("أدخل الكود (4 أرقام):", key="reset_code_in")
+                    new_p_val = st.text_input("كلمة السر الجديدة:", type="password", key="reset_pass_new")
+                    
+                    if st.button("تحديث وفتح الحساب 🔓", key="final_reset_btn"):
                         if code_in == str(st.session_state.reset_otp):
-                            db[st.session_state.reset_user]['password'] = new_p
+                            db[st.session_state.reset_user]['password'] = new_p_val
                             save_db(db)
-                            st.success("تم التحديث! سجل دخولك الآن.")
+                            st.success("تم تحديث كلمة السر بنجاح! سجل دخولك الآن.")
+                            # تنظيف الحالة لإخفاء القسم
                             del st.session_state.show_reset
                             del st.session_state.reset_otp
-                        else: st.error("الكود خطأ")
-
+                            del st.session_state.reset_user
+                        else:
+                            st.error("الكود المدخل غير صحيح.")
         with tab_signup:
             new_u = st.text_input("اسم مستخدم جديد", key="reg_u")
             new_e = st.text_input("إيميلك (Gmail)", key="reg_e")
@@ -367,6 +379,7 @@ with st.sidebar:
                 st.session_state.user_status = "Prime"
                 st.session_state.IF_VALID_CODES.remove(c_in) # استخدام لمرة واحدة
                 st.rerun()
+
 
 
 
