@@ -13,19 +13,34 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 from datetime import datetime, timedelta
 from email.message import EmailMessage
+from streamlit_cookies_manager import EncryptedCookieManager
 import time
 
+cookies = EncryptedCookieManager(prefix="elena/", password="EM2006_secret_key")
+if not cookies.ready():
+    st.stop()
+    
 # --- الدالة السحرية لحل مشكلة الوقت (فلسطين UTC+2) ---
 def get_local_time():
     # بنجيب توقيت السيرفر العالمي وبنزود ساعتين عشان يطابق ساعتك في غزة
     return datetime.utcnow() + timedelta(hours=2)
 # --- 1. إعدادات الصفحة والتصميم ---
+# --- 1. إعداد الصفحة والتصميم (أول شيء في الكود) ---
 st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
 
+# --- 2. ستايل الـ CSS المطور ---
 st.markdown("""
     <style>
-    .stApp { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: white; }
-    [data-testid="stSidebar"] { background-color: rgba(15, 12, 41, 0.8); }
+    /* خلفية التطبيق المتدرجة */
+    .stApp { 
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); 
+        color: white; 
+    }
+    /* ستايل السايدبار */
+    [data-testid="stSidebar"] { 
+        background-color: rgba(15, 12, 41, 0.8); 
+    }
+    /* صندوق تسجيل الدخول */
     .login-box {
         background-color: rgba(255, 255, 255, 0.05);
         padding: 40px;
@@ -33,9 +48,44 @@ st.markdown("""
         border: 1px solid rgba(255, 215, 0, 0.3);
         text-align: center;
     }
-    .prime-badge { background: linear-gradient(45deg, #f39c12, #f1c40f); color: black; padding: 4px 12px; border-radius: 12px; font-weight: bold; }
+    /* بادج البريميوم المطور */
+    .prime-badge { 
+        background: linear-gradient(45deg, #f39c12, #f1c40f); 
+        color: black; 
+        padding: 4px 12px; 
+        border-radius: 12px; 
+        font-weight: bold; 
+        font-size: 18px;
+        box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+    }
     </style>
     """, unsafe_allow_html=True)
+
+# --- 3. التعرف التلقائي على المستخدم من الكوكيز ---
+# هاد الكود بيمنع خروج المستخدم لما يعمل ريفريش
+if "username" in cookies and not st.session_state.get("is_logged_in"):
+    saved_user = cookies["username"]
+    db = load_db()
+    
+    # إذا كان المستخدم هو المطور (إيثان)
+    if saved_user == "ethan":
+        st.session_state.update({
+            "is_logged_in": True,
+            "username": "Ethan",
+            "user_role": "developer",
+            "user_status": "Prime"
+        })
+    # إذا كان طالب عادي
+    elif saved_user in db:
+        st.session_state.update({
+            "is_logged_in": True,
+            "username": saved_user,
+            "user_role": "user",
+            "user_status": db[saved_user].get("status", "Standard"),
+            # ملاحظة: استرجاع بيانات الجامعة من قاعدة البيانات مباشرة لضمان بقائها بعد الريفرش
+            "u_id": db[saved_user].get("u_id", ""), 
+            "u_pass": db[saved_user].get("u_pass", "")
+        })
 
 # --- 2. تهيئة الجلسة والداتا ---
 if "is_logged_in" not in st.session_state: st.session_state.is_logged_in = False
@@ -106,38 +156,49 @@ if not st.session_state.is_logged_in:
         tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 تسجيل جديد"])
         db = load_db()
 
-        with tab_login:
-            u = st.text_input("اسم المستخدم", key="l_u")
-            p = st.text_input("كلمة السر", type="password", key="l_p")
-            
-            uid_input = st.text_input("الرقم الجامعي (للمزامنة)", key="l_uid")
-            upass_input = st.text_input("باسورد الجامعة (للمزامنة)", type="password", key="l_upass")
+      with tab_login:
+    u = st.text_input("اسم المستخدم", key="l_u")
+    p = st.text_input("كلمة السر", type="password", key="l_p")
+    
+    uid_input = st.text_input("الرقم الجامعي (للمزامنة)", key="l_uid")
+    upass_input = st.text_input("باسورد الجامعة (للمزامنة)", type="password", key="l_upass")
 
-            col_in, col_forgot = st.columns(2)
+    col_in, col_forgot = st.columns(2)
+    
+    if col_in.button("دخول للنظام", use_container_width=True):
+        # 1. حالة المطور (إيثان)
+        if u == "ethan" and p == "EM2006":
+            # حفظ الكوكي للمطور
+            cookies["username"] = "ethan"
+            cookies.save()
             
-            if col_in.button("دخول للنظام", use_container_width=True):
-                if u == "ethan" and p == "EM2006":
-                    st.session_state.update({
-                        "is_logged_in": True, 
-                        "user_role": "developer", 
-                        "user_status": "Prime", 
-                        "username": "Ethan",
-                        "u_id": uid_input,
-                        "u_pass": upass_input
-                    })
-                    st.rerun()
-                elif u in db and db[u]['password'] == p:
-                    st.session_state.update({
-                        "is_logged_in": True, 
-                        "user_role": "user", 
-                        "user_status": db[u]['status'], 
-                        "username": u,
-                        "u_id": uid_input,
-                        "u_pass": upass_input
-                    })
-                    st.rerun()
-                else: 
-                    st.error("بيانات خاطئة!")
+            st.session_state.update({
+                "is_logged_in": True, 
+                "user_role": "developer", 
+                "user_status": "Prime", 
+                "username": "Ethan",
+                "u_id": uid_input,
+                "u_pass": upass_input
+            })
+            st.rerun()
+        
+        # 2. حالة الطالب العادي
+        elif u in db and db[u]['password'] == p:
+            # حفظ اسم المستخدم في الكوكيز
+            cookies["username"] = u
+            cookies.save()
+            
+            st.session_state.update({
+                "is_logged_in": True, 
+                "user_role": "user", 
+                "user_status": db[u]['status'], 
+                "username": u,
+                "u_id": uid_input,
+                "u_pass": upass_input
+            })
+            st.rerun()
+        else: 
+            st.error("بيانات خاطئة!")
 
             if col_forgot.button("نسيت كلمة السر؟", use_container_width=True):
                 st.session_state.show_reset = True
@@ -506,6 +567,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
