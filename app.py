@@ -289,14 +289,19 @@ with tabs[4]:
         st.write("👥 إحصائيات المستخدمين:")
         st.json(db_admin)
         st.markdown("---")
-        st.write(f"🔑 الأكواد المتاحة: `{st.session_state.IF_VALID_CODES}`")
-        new_c = st.text_input("إضافة كود جديد:", key="add_code_key")
-        if st.button("إضافة الكود ✅"):
+        st.write(f"🔑 الأكواد المتاحة في قاعدة البيانات: `{db['valid_codes']}`")
+        new_c = st.text_input("إضافة كود بريميوم جديد:")
+        if st.button("حفظ الكود في قاعدة البيانات ✅"):
             if new_c:
-                st.session_state.IF_VALID_CODES.append(new_c)
-                st.success("تمت الإضافة!")
+                if new_c not in db["valid_codes"]:
+                    db["valid_codes"].append(new_c)
+                    save_db(db) # حفظ دائم في ملف الـ JSON
+                    st.success(f"تم حفظ الكود [{new_c}] بنجاح لجميع المستخدمين!")
+                    st.rerun()
+                else:
+                    st.warning("هذا الكود موجود مسبقاً!")
             else:
-                st.warning("ادخل كود")
+                st.warning("أدخل كود أولاً.")
     else:
         st.error("🚫 عذراً، هذا التبويب مخصص للمطور فقط.")
         
@@ -312,6 +317,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
