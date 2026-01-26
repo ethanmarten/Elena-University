@@ -195,19 +195,19 @@ badge = '<span class="prime-badge">PRIME 👑</span>' if st.session_state.user_s
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
 # هيدر الترحيب (تأكد أن الأسطر تبدأ من بداية السطر تماماً بدون مسافات)
-# كود الهيدر العلوي
-main_badge = "👑" if st.session_state.user_status == "Prime" else ""
-st.title(f"Elena Student AI {main_badge}")
-
-# --- كود الترحيب اللي بعته أنت (تحته مباشرة) ---
+# 2. تحديد الاسم والـ Badge
 role_name = "إيثان" if st.session_state.get("user_role") == "developer" else "طالب إيلينا"
 
 if st.session_state.get("user_status") == "Prime":
-    badge = '<span style="background:#FFD700; color:black; padding:2px 10px; border-radius:10px; font-size:18px; margin-right:10px;">PRIME MEMBER 👑</span>'
+    # التاج الذهبي اللي رح يضل لحاله
+    badge = '<span style="background:#FFD700; color:black; padding:2px 10px; border-radius:10px; font-size:18px; margin-right:10px; font-weight:bold;">PRIME MEMBER 👑</span>'
 else:
+    # تاج رمادي بسيط أو اتركه فارغاً ""
     badge = '<span style="background:#f0f2f6; color:#666; padding:2px 10px; border-radius:10px; font-size:18px; margin-right:10px;">STANDARD 🎓</span>'
 
+# 3. عرض الترحيب النهائي
 st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
+st.markdown("---")
 
 # --- نافذة الاشتراك (Upgrade Section) ---
 if st.session_state.user_status == "Standard":
@@ -457,6 +457,7 @@ with st.sidebar:
                     st.error("فشلت المزامنة، تأكد من البيانات.")
         else:
             st.warning("يرجى إدخال الرقم الجامعي وكلمة المرور.")
+
 
 
 
