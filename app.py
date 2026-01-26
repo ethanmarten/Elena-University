@@ -177,37 +177,37 @@ else: user_syncs = 0
 badge = '<span class="prime-badge">PRIME 👑</span>' if st.session_state.user_status == "Prime" else ""
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
-# هيدر الترحيب (سطر 180)
-    role_name = "إيثان" if st.session_state.user_role == "developer" else "طالب إيلينا"
-    badge = '<span class="prime-badge">PRIME MEMBER 👑</span>' if st.session_state.user_status == "Prime" else ""
-    st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
+# هيدر الترحيب (تأكد أن الأسطر تبدأ من بداية السطر تماماً بدون مسافات)
+role_name = "إيثان" if st.session_state.user_role == "developer" else "طالب إيلينا"
+badge = '<span class="prime-badge">PRIME MEMBER 👑</span>' if st.session_state.user_status == "Prime" else ""
+st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
 
-    # نافذة الاشتراك (Upgrade Section)
-    if st.session_state.user_status == "Standard":
-        with st.expander("⭐ تفعيل عضوية برايم (Prime Membership)"):
-            col_pay, col_code = st.columns(2)
-            with col_pay:
-                st.write("### 💳 طرق الدفع المحلية")
-                st.write("- **محفظة جوال باي:** `0594820775`")
-                st.write("- **بنك فلسطين:** `1701577` (إيهاب الحايك)")
-                st.write("- **تواصل واتساب:** [اضغط هنا للترقية](https://wa.me/+972594820775)")
-            with col_code:
-                st.write("### 🔑 تفعيل بكود")
-                # ملاحظة: تأكد أن IF_VALID_CODES معرفة فوق أو استخدم st.session_state.IF_VALID_CODES
-                code_in = st.text_input("أدخل كود الاشتراك:", key="upgrade_code_input")
-                if st.button("تفعيل الآن"):
-                    if code_in in st.session_state.get('IF_VALID_CODES', []):
-                        st.session_state.user_status = "Prime"
-                        # تحديث الحالة في قاعدة البيانات أيضاً
-                        db = load_db()
-                        if st.session_state.username in db:
-                            db[st.session_state.username]["status"] = "Prime"
-                            save_db(db)
-                        st.success("تم التفعيل! أنت الآن مستخدم برايم.")
-                        time.sleep(1)
-                        st.rerun()
-                    else: st.error("الكود غير صالح")
-
+# نافذة الاشتراك (Upgrade Section)
+if st.session_state.user_status == "Standard":
+    with st.expander("⭐ تفعيل عضوية برايم (Prime Membership)"):
+        col_pay, col_code = st.columns(2)
+        with col_pay:
+            st.write("### 💳 طرق الدفع المحلية")
+            st.write("- **محفظة جوال باي:** `0594820775`")
+            st.write("- **بنك فلسطين:** `1701577` (إيهاب الحايك)")
+            st.write("- **تواصل واتساب:** [اضغط هنا للترقية](https://wa.me/+972594820775)")
+        with col_code:
+            st.write("### 🔑 تفعيل بكود")
+            code_in = st.text_input("أدخل كود الاشتراك:", key="unique_upgrade_key")
+            if st.button("تفعيل الآن"):
+                valid_codes = st.session_state.get('IF_VALID_CODES', [])
+                if code_in in valid_codes:
+                    st.session_state.user_status = "Prime"
+                    db = load_db()
+                    if st.session_state.username in db:
+                        db[st.session_state.username]["status"] = "Prime"
+                        save_db(db)
+                    st.success("تم التفعيل! أنت الآن مستخدم برايم.")
+                    time.sleep(1)
+                    st.rerun()
+                else: 
+                    st.error("الكود غير صالح")
+                    
 # حماية الليمت
 if st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
     remaining = 10 - user_syncs
@@ -312,6 +312,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
