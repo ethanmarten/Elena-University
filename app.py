@@ -275,22 +275,29 @@ with tabs[3]:
             response = st.session_state.chat_session.send_message(chat_input)
             st.write(response.text)
 
-# 5. الإدارة (حصري لإيثان فقط)
+# --- 5. الإدارة (حصري لإيثان) ---
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
-        st.subheader("🛠️ لوحة تحكم المطور")
+        role_name = "إيثان"
+        st.subheader(f"🛠️ لوحة تحكم المطور: {role_name}")
+        
         db_admin = load_db()
-        st.write("👥 إحصائيات المستخدمين:")
+        st.write("👥 إحصائيات المستخدمين المسجلين في النظام:")
         st.json(db_admin)
         
         st.markdown("---")
-        st.write(f"🔑 الأكواد المتاحة: `{st.session_state.IF_VALID_CODES}`")
-        new_c = st.text_input("إضافة كود جديد:")
-        if st.button("إضافة الكود ✅"):
-            st.session_state.IF_VALID_CODES.append(new_c)
-            st.success("تم!")
+        st.write(f"🔑 الأكواد المتاحة حالياً: `{st.session_state.IF_VALID_CODES}`")
+        
+        new_c = st.text_input("أدخل كود بريميوم جديد لإضافته:", key="admin_new_code")
+        if st.button("إضافة الكود ✅", use_container_width=True):
+            if new_c:
+                st.session_state.IF_VALID_CODES.append(new_c)
+                st.success(f"تمت إضافة الكود [{new_c}] بنجاح إلى القائمة!")
+            else:
+                st.warning("يرجى كتابة كود أولاً.")
     else:
-        st.error("🚫 عذراً، هذا التبويب مخصص للمطور فقط.")
+        st.error("🚫 عذراً، هذا التبويب مخصص للمطور فقط (إيثان).")
+        st.info("إذا كنت طالب وترغب في الترقية، يرجى التواصل مع الإدارة.")
         
 with st.sidebar:
     st.header("⚙️ المزامنة")
@@ -304,6 +311,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
