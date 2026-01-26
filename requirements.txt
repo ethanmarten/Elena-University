@@ -3,3 +3,4 @@ google-generativeai
 selenium
 webdriver-manager
 pandas
+streamlit-cookies-manager
