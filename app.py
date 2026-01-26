@@ -297,34 +297,54 @@ with tabs[4]:
         role_name = "إيثان"
         st.subheader(f"🛠️ لوحة تحكم المطور: {role_name}")
         
-        # قراءة قاعدة البيانات
         db = load_db()
         
-        st.write("👥 إحصائيات المستخدمين:")
+        # 1. إحصائيات المستخدمين (JSON)
+        st.write("👥 بيانات النظام والمستخدمين:")
         st.json(db)
         
         st.markdown("---")
         
-        # التأكد من وجود مفتاح الأكواد في الملف
-        if "valid_codes" not in db:
-            db["valid_codes"] = []
-            save_db(db)
-
-        current_codes = db.get("valid_codes", [])
-        st.write(f"🔑 الأكواد المتاحة في قاعدة البيانات: `{current_codes}`")
-        
-        new_c = st.text_input("إضافة كود بريميوم جديد:", key="admin_final_input")
-        if st.button("حفظ الكود في قاعدة البيانات ✅"):
+        # 2. قسم إضافة الأكواد الزمنية
+        st.write("🔑 **توليد أكواد بريميوم زمنية**")
+        col_c, col_t = st.columns([2, 1])
+        with col_c:
+            new_c = st.text_input("أدخل الكود الجديد:", key="admin_code_in")
+        with col_t:
+            duration = st.selectbox("المدة:", ["1H", "1D", "1M", "1Y"], key="dur_in")
+            
+        if st.button("حفظ الكود الزمني ✅", use_container_width=True):
             if new_c:
-                if new_c not in db["valid_codes"]:
-                    db["valid_codes"].append(new_c)
-                    save_db(db)
-                    st.success(f"تم حفظ الكود [{new_c}] بنجاح!")
-                    st.rerun()
-                else:
-                    st.warning("هذا الكود موجود مسبقاً!")
-            else:
-                st.warning("أدخل كود أولاً.")
+                if "timed_codes" not in db: db["timed_codes"] = {}
+                db["timed_codes"][new_c] = duration
+                save_db(db)
+                st.success(f"تم حفظ الكود {new_c} لمدة {duration}")
+                st.rerun()
+            else: st.warning("اكتب الكود أولاً")
+
+        if "timed_codes" in db and db["timed_codes"]:
+            st.write("📋 الأكواد المتوفرة حالياً:", db["timed_codes"])
+
+        st.markdown("---")
+
+        # 3. قسم إدارة المستخدمين (إلغاء الاشتراك)
+        st.write("🚫 **إدارة الاشتراكات الفعالة**")
+        # فلترة المستخدمين الـ Prime فقط لإلغاء اشتراكهم
+        prime_users = [u for u, data in db.items() if isinstance(data, dict) and data.get("status") == "Prime"]
+        
+        if prime_users:
+            selected_user = st.selectbox("اختر مستخدم لإلغاء اشتراكه:", prime_users)
+            if st.button(f"إلغاء اشتراك {selected_user} فوراً ⚠️"):
+                db[selected_user]["status"] = "Standard"
+                # حذف تاريخ الانتهاء إذا وجد
+                if "expire_at" in db[selected_user]:
+                    del db[selected_user]["expire_at"]
+                save_db(db)
+                st.error(f"تم سحب رتبة البريميوم من {selected_user}")
+                st.rerun()
+        else:
+            st.info("لا يوجد مستخدمين بريميوم حالياً.")
+            
     else:
         st.error("🚫 عذراً، هذا التبويب مخصص للمطور فقط.")
         
@@ -340,6 +360,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
