@@ -179,8 +179,8 @@ st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
 # هيدر الترحيب
     role_name = "إيثان" if st.session_state.user_role == "developer" else "طالب إيلينا"
-    badge = '<span class="prime-badge">PRIME MEMBER 👑</span>' if st.session_state.user_status == "Prime" else ""
-    st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
+        badge = '<span class="prime-badge">PRIME MEMBER 👑</span>' if st.session_state.user_status == "Prime" else ""
+        st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
 
     # نافذة الاشتراك (Upgrade Section)
     if st.session_state.user_status == "Standard":
@@ -306,6 +306,7 @@ with st.sidebar:
                 db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
                 save_db(db)
             st.rerun()
+
 
 
 
