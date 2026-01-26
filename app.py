@@ -30,6 +30,40 @@ cookies = EncryptedCookieManager(prefix="elena/", password="EM2006_secret_key")
 if not cookies.ready():
     st.stop()
 
+def get_course_content(course_url):
+    try:
+        # 1. الدخول لرابط المادة المحدد
+        driver.get(course_url)
+        time.sleep(4) # انتظار تحميل محتويات المودل
+        
+        links_found = []
+        
+        # 2. في المودل، الملفات والروابط غالباً تكون داخل كلاسات معينة (activityinstance)
+        # سنبحث عن كل الروابط التي تحتوي على ملفات أو فيديوهات
+        elements = driver.find_elements(By.CSS_SELECTOR, "div.activityinstance a")
+        
+        if not elements: # محاولة أخرى لو كان التصميم مختلفاً
+            elements = driver.find_elements(By.TAG_NAME, "a")
+
+        for elem in elements:
+            href = elem.get_attribute("href")
+            text = elem.text
+            
+            if href:
+                # تصفية الروابط المهمة (ملف، فيديو، أو صفحة محتوى)
+                if any(ext in href for ext in [".pdf", "resource", "url", "video", "youtube"]):
+                    # استبعاد روابط التنسيق أو الملفات غير الضرورية
+                    if "forcedownload=1" in href or "mod/resource" in href or "mod/url" in href:
+                        links_found.append({
+                            "name": text if text else "ملف/رابط غير مسمى",
+                            "url": href
+                        })
+        
+        return links_found
+    except Exception as e:
+        print(f"Error grabbing content: {e}")
+        return []
+        
 def summarize_content(text_to_analyze, type="ملف"):
     try:
         response = client.chat.completions.create(
@@ -39,7 +73,12 @@ def summarize_content(text_to_analyze, type="ملف"):
                 {"role": "user", "content": f"المحتوى المراد تلخيصه:\n\n{text_to_analyze[:15000]}"} 
             ],
         )
-        return response.choices[0].message.content
+        summary = response.choices[0].message.content
+        
+        # التعديل هون: حفظ التلخيص عشان إيلينا تشوفه في الشات
+        st.session_state.last_summary = summary 
+        
+        return summary
     except Exception as e:
         return f"حدث خطأ في التلخيص: {e}"
     
@@ -453,31 +492,54 @@ with tabs[0]:
         st.warning("⚠️ لا توجد بيانات حالياً. الرجاء جلب البيانات من موقع الجامعة أولاً.")
 # --- داخل تبويب المساقات ---
 with tabs[1]: 
-    st.subheader("📖 محلل المحتوى الذكي")
+st.subheader("📖 مستكشف محتوى المساقات")
     
-    uploaded_file = st.file_uploader("ارفع ملف المساق (PDF) أو ضع رابط الفيديو:", type="pdf")
+    # قائمة المواد
+    course_to_scan = st.selectbox("اختر المادة المراد استكشافها:", ["برمجة 1", "إحصاء", "تفاضل"])
     
-    if uploaded_file is not None:
-        if st.button("إيلينا، لخصي الملف ✨"):
-            with st.spinner("جاري قراءة وتلخيص الملف..."):
-                # قراءة الـ PDF
-                pdf_reader = PyPDF2.PdfReader(uploaded_file)
-                full_text = ""
-                for page in pdf_reader.pages:
-                    full_text += page.extract_text()
-                
-                summary = summarize_content(full_text, "ملف PDF")
-                st.success("✅ تلخيص الملف:")
-                st.markdown(summary)
+    if st.button(f"افتح محتويات {course_to_scan}"):
+        with st.spinner("جاري جرد الملفات والفيديوهات من المودل..."):
+            # الرابط الفعلي للمادة (يجب تغييره حسب المادة المختارة)
+            course_url = "https://moodle.iugaza.edu.ps/course/view.php?id=123" 
+            links = get_course_content(course_url)
+            st.session_state.current_course_links = links
 
-    # قسم تحليل الروابط (فيديو)
-    video_url = st.text_input("أو ضع رابط فيديو المحاضرة هنا:")
-    if video_url and st.button("حللي الفيديو 🎥"):
-        with st.spinner("جاري تحليل محتوى الفيديو..."):
-            # ملاحظة: هنا ستحتاج لاستخدام أداة لسحب الـ Transcript 
-            # سأضع لك مثالاً لو كان النص متاحاً
-            st.info("هذه الميزة تتطلب ربطها بـ YouTube API لسحب الكلام من الفيديو وتحليله.")
-
+    if "current_course_links" in st.session_state:
+        for link in st.session_state.current_course_links:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"📄 {link['name']}")
+            with col2:
+                # استخدمنا الـ URL كـ Key فريد للزر
+                if st.button("حلل الآن", key=link['url']):
+                    with st.spinner("إيلينا تقرأ وتحلل الآن..."):
+                        try:
+                            if ".pdf" in link['url'] or "resource" in link['url']:
+                                # 1. تحميل ملف الـ PDF برمجياً
+                                import requests
+                                response = requests.get(link['url'])
+                                pdf_file = io.BytesIO(response.content)
+                                
+                                # 2. استخراج النص
+                                pdf_reader = PyPDF2.PdfReader(pdf_file)
+                                text = ""
+                                for page in pdf_reader.pages:
+                                    text += page.extract_text()
+                                
+                                # 3. المناداة: إرسال النص لدالة التلخيص
+                                summary = summarize_content(text, "ملف محاضرة PDF")
+                                st.success("✅ اكتمل التلخيص! اذهب لـ 'Ask Elena' لمناقشته.")
+                                st.markdown(summary)
+                                
+                            else:
+                                # في حال كان رابط فيديو أو يوتيوب
+                                st.info("تحليل الفيديو سيعتمد على الرابط حالياً...")
+                                summary = summarize_content(f"رابط فيديو للمادة: {link['url']}", "فيديو تعليمي")
+                                st.markdown(summary)
+                                
+                        except Exception as e:
+                            st.error(f"حدث خطأ أثناء التحليل: {e}")
+                            
 # 3. الدرجات (الشغالة تمام)
 with tabs[2]:
     st.subheader("📊 تحليل العلامات التفصيلي")
@@ -778,6 +840,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
