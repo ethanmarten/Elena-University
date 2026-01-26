@@ -25,22 +25,6 @@ st.markdown("""
         color: white;
     }
     
-    /* أيقونة الاشتراك فوق على اليمين */
-    .upgrade-button {
-        position: fixed;
-        top: 15px;
-        right: 15px;
-        background: linear-gradient(45deg, #FFD700, #FFA500);
-        padding: 10px 20px;
-        border-radius: 25px;
-        color: black !important;
-        font-weight: bold;
-        text-decoration: none;
-        z-index: 9999;
-        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-        border: none;
-    }
-
     .prime-badge {
         background: linear-gradient(45deg, #f39c12, #f1c40f);
         color: black;
@@ -52,21 +36,30 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* تجميل المدخلات */
-    .stTextInput>div>div>input {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        color: white !important;
-        border-radius: 10px !important;
+    /* تجميل الجداول والكروت في لوحة التحكم */
+    .admin-card {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. إدارة الأكواد والحسابات ---
-# أكواد التفعيل التي يمكنك بيعها للطلاب
-IF_VALID_CODES = ["ELENA-PRO-2026", "ETHAN-GIFT", "STUDENT-VIP"]
+# --- 2. إدارة البيانات (قاعدة بيانات وهمية للطلاب) ---
+if "IF_VALID_CODES" not in st.session_state:
+    st.session_state.IF_VALID_CODES = ["ELENA-PRO-2026", "ETHAN-GIFT", "STUDENT-VIP"]
+
+if "users_db" not in st.session_state:
+    # بيانات أولية للتجربة
+    st.session_state.users_db = [
+        {"username": "user", "status": "Standard", "syncs": 0},
+        {"username": "student_test", "status": "Prime", "syncs": 5}
+    ]
 
 if "user_status" not in st.session_state:
-    st.session_state.user_status = "Standard" # Default status
+    st.session_state.user_status = "Standard"
 
 # --- 3. إعدادات الذكاء الاصطناعي ---
 try:
@@ -82,7 +75,7 @@ if "chat_session" not in st.session_state:
 if "courses" not in st.session_state: st.session_state.courses = {}
 if "sync_count" not in st.session_state: st.session_state.sync_count = 0
 
-# --- 4. محرك السيلينيوم (نفس وظائفه السابقة) ---
+# --- 4. محرك السيلينيوم ---
 def run_selenium_task(username, password, task_type="timeline", course_url=None):
     options = Options()
     options.add_argument('--headless')
@@ -104,11 +97,47 @@ def run_selenium_task(username, password, task_type="timeline", course_url=None)
             els = driver.find_elements(By.CSS_SELECTOR, "a[href*='course/view.php?id=']")
             courses = {el.text.strip(): el.get_attribute("href") for el in els if len(el.text) > 5}
             return {"text": text, "courses": courses}
-        # ... (باقي المهام: الدرجات والمصادر)
     except Exception as e: return {"error": str(e)}
     finally: driver.quit()
 
-# --- 5. نظام تسجيل الدخول المزدوج ---
+# --- 5. لوحة تحكم المدير (إيثان) ---
+def admin_dashboard():
+    st.markdown("## 🛠️ لوحة تحكم المطور (إيثان)")
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("إجمالي المستخدمين", len(st.session_state.users_db))
+    col2.metric("أعضاء برايم", len([u for u in st.session_state.users_db if u['status'] == 'Prime']))
+    col3.metric("الأكواد المتاحة", len(st.session_state.IF_VALID_CODES))
+
+    st.write("---")
+    
+    # إدارة المستخدمين
+    st.subheader("👥 إدارة حسابات الطلاب")
+    for i, user in enumerate(st.session_state.users_db):
+        with st.container():
+            c1, c2, c3, c4 = st.columns([2, 2, 1, 2])
+            c1.write(f"👤 {user['username']}")
+            c2.write(f"🛡️ {user['status']}")
+            c3.write(f"🔄 {user['syncs']}")
+            if user['status'] == "Standard":
+                if c4.button(f"ترقية لـ Prime", key=f"upgrade_{i}"):
+                    st.session_state.users_db[i]['status'] = "Prime"
+                    st.success(f"تم ترقية {user['username']}!")
+                    st.rerun()
+
+    st.write("---")
+    
+    # إدارة الأكواد
+    st.subheader("🔑 توليد أكواد اشتراك جديدة")
+    new_code = st.text_input("اكتب الكود الجديد:")
+    if st.button("إضافة الكود"):
+        if new_code and new_code not in st.session_state.IF_VALID_CODES:
+            st.session_state.IF_VALID_CODES.append(new_code)
+            st.success(f"تم إضافة الكود: {new_code}")
+        else:
+            st.error("الكود فارغ أو موجود مسبقاً")
+
+# --- 6. نظام تسجيل الدخول ---
 def check_login():
     if "is_logged_in" not in st.session_state:
         st.session_state.is_logged_in = False
@@ -120,7 +149,6 @@ def check_login():
         col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
             method = st.tabs(["👤 اسم المستخدم", "📧 Google Login"])
-            
             with method[0]:
                 u_in = st.text_input("Username")
                 p_in = st.text_input("Password", type="password")
@@ -135,56 +163,66 @@ def check_login():
                         st.session_state.user_role = "user"
                         st.rerun()
                     else: st.error("بيانات خاطئة")
-            
             with method[1]:
-                st.info("تسجيل الدخول عبر Google متاح حالياً للمشتركين المسجلين مسبقاً.")
+                st.info("تسجيل الدخول عبر Google متاح للمشتركين فقط.")
                 st.button("Continue with Google", disabled=True)
         return False
     return True
 
-# --- 6. واجهة الموقع بعد الدخول ---
+# --- 7. تشغيل الموقع الرئيسي ---
 if check_login():
-    # عرض أيقونة الاشتراك في حال كان المستخدم Standard
-    if st.session_state.user_status == "Standard":
-        if st.button("👑 Upgrade to Prime", key="up_btn"):
-            st.session_state.show_upgrade = True
-
     # هيدر الترحيب
     role_name = "إيثان" if st.session_state.user_role == "developer" else "طالب إيلينا"
     badge = '<span class="prime-badge">PRIME MEMBER 👑</span>' if st.session_state.user_status == "Prime" else ""
     st.markdown(f"<h2>أهلاً {role_name} {badge}</h2>", unsafe_allow_html=True)
 
-    # نافذة الاشتراك (Upgrade Section)
-    if st.session_state.user_status == "Standard":
-        with st.expander("⭐ تفعيل عضوية برايم (Prime Membership)"):
-            col_pay, col_code = st.columns(2)
-            with col_pay:
-                st.write("### 💳 طرق الدفع المحلية")
-                st.write("- **محفظة جوال باي:** `0594820775`")
-                st.write("- **بنك فلسطين:** `1701577` (إيهاب الحايك)")
-                st.write("- **تواصل واتساب:** [اضغط هنا للترقية](https://wa.me/+972594820775)")
-            with col_code:
-                st.write("### 🔑 تفعيل بكود")
-                code_in = st.text_input("أدخل كود الاشتراك:")
-                if st.button("تفعيل الآن"):
-                    if code_in in IF_VALID_CODES:
-                        st.session_state.user_status = "Prime"
-                        st.success("تم التفعيل! أنت الآن مستخدم برايم.")
-                        time.sleep(1)
-                        st.rerun()
-                    else: st.error("الكود غير صالح")
+    # تبويبات الموقع
+    tab_list = ["📅 Smart Planner", "📚 Resources", "📊 Grades", "💬 Ask Elena"]
+    if st.session_state.user_role == "developer":
+        tab_list.append("🛠️ Admin Panel")
+    
+    tabs = st.tabs(tab_list)
 
-    # تحديد الليمت بناءً على الرتبة
-    if st.session_state.user_status == "Prime":
-        limit_val = "Unlimited ♾️"
-    else:
-        limit_val = f"{10 - st.session_state.sync_count} / 10"
-        if (10 - st.session_state.sync_count) <= 0:
-            st.error("🚫 استنفدت محاولاتك. يرجى الترقية لبرايم.")
-            st.stop()
+    # تبويب المخطط الذكي
+    with tabs[0]:
+        if st.session_state.user_status == "Standard":
+            with st.expander("⭐ تفعيل عضوية برايم (Prime Membership)"):
+                col_pay, col_code = st.columns(2)
+                with col_pay:
+                    st.write("### 💳 دفع محلي")
+                    st.write("- **محفظة جوال باي:** `059594820775`\n- **بنك فلسطين:** `1701577`\n- **واتساب:** [راسلني](https://wa.me/+972594820775)")
+                with col_code:
+                    code_in = st.text_input("أدخل الكود:")
+                    if st.button("تفعيل"):
+                        if code_in in st.session_state.IF_VALID_CODES:
+                            st.session_state.user_status = "Prime"
+                            st.success("تم التفعيل!")
+                            st.rerun()
+        
+        if "timeline_data" in st.session_state:
+            if st.button("رتب لي جدول دراستي 📅"):
+                p = f"رتب المهام حسب الأولوية في جدول: {st.session_state.timeline_data}"
+                resp = st.session_state.chat_session.send_message(p)
+                st.write(resp.text)
+        else: st.info("قم بالمزامنة أولاً من القائمة الجانبية.")
 
+    # تبويب الدردشة
+    with tabs[3]:
+        st.caption("🤖 إيلينا في وضع الذكاء الأكاديمي")
+        if chat_input := st.chat_input("اسأل إيلينا..."):
+            with st.chat_message("assistant"):
+                response = st.session_state.chat_session.send_message(chat_input)
+                st.write(response.text)
+
+    # تبويب لوحة التحكم (يظهر فقط لإيثان)
+    if st.session_state.user_role == "developer":
+        with tabs[4]:
+            admin_dashboard()
+
+    # القائمة الجانبية وحالة الحساب
     with st.sidebar:
         st.header("📊 Account Status")
+        limit_val = "Unlimited ♾️" if st.session_state.user_status == "Prime" else f"{10 - st.session_state.sync_count} / 10"
         st.write(f"Plan: **{st.session_state.user_status}**")
         st.write(f"Syncs left: **{limit_val}**")
         st.markdown("---")
@@ -198,23 +236,4 @@ if check_login():
                 else:
                     st.session_state.timeline_data = res['text']
                     st.session_state.courses = res['courses']
-                    st.success("Done!")
-
-    # التبويبات الرئيسية
-    tabs = st.tabs(["📅 Smart Planner", "📚 Resources", "📊 Grades", "💬 Ask Elena"])
-    
-    with tabs[0]:
-        if "timeline_data" in st.session_state:
-            if st.button("رتب لي جدول دراستي 📅"):
-                p = f"رتب المهام حسب الأولوية في جدول: {st.session_state.timeline_data}"
-                resp = st.session_state.chat_session.send_message(p)
-                st.write(resp.text)
-        else: st.info("قم بالمزامنة أولاً")
-
-    with tabs[3]:
-        st.caption("🤖 إيلينا في وضع الذكاء الأكاديمي المتطور")
-        if chat_input := st.chat_input("اسأل إيلينا..."):
-            with st.chat_message("assistant"):
-                response = st.session_state.chat_session.send_message(chat_input)
-                st.write(response.text)
-
+                    st.success("تمت المزامنة!")
