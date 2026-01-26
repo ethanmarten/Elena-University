@@ -377,27 +377,43 @@ with tabs[4]:
         
 with st.sidebar:
     # --- عرض تاريخ انتهاء الاشتراك (فقط للـ Prime) ---
-if st.session_state.get("user_status") == "Prime":
-    expire_str = db.get(current_u, {}).get("expire_at")
-    if expire_str:
-        # تنسيق التاريخ لشكل أحلى (يوم/شهر/سنة ساعة:دقيقة)
-        try:
-            dt_obj = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
-            pretty_date = dt_obj.strftime("%Y/%m/%d - %I:%M %p")
-            st.info(f"📅 ينتهي اشتراكك في: **{pretty_date}**")
-        except:
-            st.info(f"📅 ينتهي اشتراكك في: {expire_str}")
+    if st.session_state.get("user_status") == "Prime":
+        expire_str = db.get(current_u, {}).get("expire_at")
+        if expire_str:
+            try:
+                # تحويل النص لتاريخ وتنسيقه
+                dt_obj = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
+                pretty_date = dt_obj.strftime("%Y/%m/%d - %I:%M %p")
+                st.info(f"📅 ينتهي اشتراكك في:\n**{pretty_date}**")
+            except:
+                st.info(f"📅 ينتهي اشتراكك في: {expire_str}")
+    
     st.header("⚙️ المزامنة")
     uid = st.text_input("الرقم الجامعي")
     upass = st.text_input("كلمة المرور", type="password")
-    if st.button("🚀 Sync Now"):
-        res = run_selenium_task(uid, upass, "timeline")
-        if "courses" in res:
-            st.session_state.update({"courses": res['courses'], "timeline_data": res['text'], "u_id": uid, "u_pass": upass})
-            if st.session_state.user_role != "developer":
-                db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
-                save_db(db)
-            st.rerun()
+    
+    if st.button("🚀 Sync Now", use_container_width=True):
+        if uid and upass:
+            with st.spinner("جاري المزامنة... انتظر قليلاً"):
+                res = run_selenium_task(uid, upass, "timeline")
+                if "courses" in res:
+                    st.session_state.update({
+                        "courses": res['courses'], 
+                        "timeline_data": res['text'], 
+                        "u_id": uid, 
+                        "u_pass": upass
+                    })
+                    # تحديث عداد المزامنات للمستخدم العادي
+                    if st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
+                        db[current_u]["sync_count"] = db.get(current_u, {}).get("sync_count", 0) + 1
+                        save_db(db)
+                    
+                    st.success("تمت المزامنة بنجاح!")
+                    st.rerun()
+                else:
+                    st.error("فشلت المزامنة، تأكد من البيانات.")
+        else:
+            st.warning("يرجى إدخال الرقم الجامعي وكلمة المرور.")
 
 
 
