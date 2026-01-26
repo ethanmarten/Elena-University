@@ -147,16 +147,7 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
     except Exception as e: return {"error": str(e)}
     finally: driver.quit()
 
-if not st.session_state.is_logged_in:
-    _, center_col, _ = st.columns([1, 2, 1])
-    with center_col:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.markdown("<h1 style='color: #FFD700;'>👑 Elena AI Portal</h1>", unsafe_allow_html=True)
-        
-        tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 تسجيل جديد"])
-        db = load_db()
-
-     # --- 4. واجهة تسجيل الدخول المطورة ---
+# --- 4. واجهة تسجيل الدخول المطورة ---
 if not st.session_state.get("is_logged_in"):
     _, center_col, _ = st.columns([1, 2, 1])
     with center_col:
@@ -209,6 +200,7 @@ if not st.session_state.get("is_logged_in"):
             if col_forgot.button("نسيت كلمة السر؟", use_container_width=True):
                 st.session_state.show_reset = True
 
+            # --- استعادة كلمة السر ---
             if st.session_state.get("show_reset"):
                 st.markdown("---")
                 re_e = st.text_input("إيميلك المسجل:")
@@ -235,9 +227,9 @@ if not st.session_state.get("is_logged_in"):
                         else: st.error("الكود خطأ")
 
         with tab_signup:
-            nu = st.text_input("اسم مستخدم", key="s_u")
+            nu = st.text_input("اسم مستخدم جديد", key="s_u")
             ne = st.text_input("Gmail", key="s_e")
-            np = st.text_input("كلمة سر", type="password", key="s_p")
+            np = st.text_input("كلمة سر جديدة", type="password", key="s_p")
             
             if st.button("إرسال كود التحقق 📧"):
                 if nu in db: st.error("موجود مسبقاً")
@@ -249,7 +241,7 @@ if not st.session_state.get("is_logged_in"):
                         st.success("تفقد إيميلك")
             
             if "temp_otp" in st.session_state:
-                otp_in = st.text_input("أدخل الكود التحقق:")
+                otp_in = st.text_input("أدخل كود التحقق:")
                 if st.button("تأكيد الحساب"):
                     if otp_in == str(st.session_state.temp_otp):
                         d = st.session_state.temp_data
@@ -262,7 +254,7 @@ if not st.session_state.get("is_logged_in"):
                         st.error("الكود غير صحيح")
 
         st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
+    st.stop() # يمنع ظهور محتويات التطبيق قبل تسجيل الدخول
 
 # --- 5. الواجهة الرئيسية ---
 db = load_db()
@@ -573,6 +565,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
