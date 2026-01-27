@@ -226,6 +226,7 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--window-size=1920,1080')
     options.binary_location = "/usr/bin/chromium" 
 
     driver = None
@@ -233,33 +234,41 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
         service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
         driver = webdriver.Chrome(service=service, options=options)
         
-        # 1. الدخول
+        # 1. الدخول عبر بوابة SSO
         driver.get("https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass")
         time.sleep(3)
+        
         driver.find_element(By.ID, "username").send_keys(username)
         p_field = driver.find_element(By.ID, "password")
         p_field.send_keys(password)
         p_field.send_keys(Keys.ENTER)
         
-        # انتظر تحميل الداشبورد (زدنا الوقت لـ 15 ثانية للتأكد)
+        # انتظر التحويل للمودل (وقت كافٍ للتحميل)
         time.sleep(15) 
 
-        # سحب الاسم الحقيقي
-        student_name = "مستخدم إيلينا"
-        try:
-            student_name = driver.find_element(By.CSS_SELECTOR, ".usertext, .username, .userbutton span").text
-        except: pass
+        # 2. سحب الاسم الحقيقي (تجربة عدة سيلكتورز)
+        student_name = "طالب جامعي"
+        for sel in [".usertext", ".userbutton span", ".username"]:
+            try:
+                name_element = driver.find_element(By.CSS_SELECTOR, sel)
+                if name_element.text.strip():
+                    student_name = name_element.text.strip()
+                    break
+            except: continue
 
         if task_type == "timeline":
-            # سحب الكورسات
+            # سحب الكورسات من الداشبورد
             links = driver.find_elements(By.CSS_SELECTOR, "a[href*='course/view.php?id=']")
-            course_map = {l.text.strip(): l.get_attribute("href") for l in links if len(l.text) > 8}
+            course_map = {}
+            for l in links:
+                t = l.text.strip()
+                if len(t) > 10 and t not in course_map: # فلترة الأسماء القصيرة
+                    course_map[t] = l.get_attribute("href")
             
-            # سحب التايم لاين بطريقة أقوى (نبحث عن أي نص فيه تاريخ أو واجب)
+            # سحب المخطط الزمني
             timeline_events = []
             try:
-                # سحب كل الروابط داخل بلوك التايم لاين
-                events = driver.find_elements(By.CSS_SELECTOR, ".event-name, [data-region='event-list-item'] a")
+                events = driver.find_elements(By.CSS_SELECTOR, "[data-region='event-list-item'] a, .event-name")
                 timeline_events = [e.text.strip() for e in events if e.text.strip()]
             except: pass
             
@@ -269,29 +278,23 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
             if target_url:
                 g_url = target_url.replace("course/view.php", "grade/report/user/index.php")
                 driver.get(g_url)
-                time.sleep(10) # صفحة العلامات ثقيلة جداً
-                
+                time.sleep(10)
                 try:
-                    # جربنا سحب الجدول بكذا طريقة (لو فشل الأول بيجرب الثاني)
-                    try:
-                        grade_data = driver.find_element(By.CSS_SELECTOR, "table.user-grade").text
-                    except:
-                        grade_data = driver.find_element(By.TAG_NAME, "table").text # سحب أول جدول متاح
-                    
+                    # محاولة سحب جدول الدرجات بأكثر من طريقة
+                    grade_data = driver.find_element(By.CSS_SELECTOR, "table.user-grade, table").text
                     return {"data": grade_data, "student_name": student_name}
                 except:
-                    return {"error": "لم نجد جدول العلامات، قد تكون المادة لا تحتوي على علامات مرصودة حالياً."}
+                    return {"error": "لم يتم العثور على جدول الدرجات."}
 
         elif task_type == "browse":
             if target_url:
                 driver.get(target_url)
                 time.sleep(8)
-                # سحب محتوى المادة الأساسي
                 try:
-                    main_content = driver.find_element(By.ID, "region-main").text
+                    content = driver.find_element(By.ID, "region-main").text
                 except:
-                    main_content = driver.find_element(By.TAG_NAME, "body").text
-                return {"course_content": main_content, "student_name": student_name}
+                    content = driver.find_element(By.TAG_NAME, "body").text
+                return {"course_content": content, "student_name": student_name}
 
     except Exception as e:
         return {"error": str(e)}
@@ -595,34 +598,34 @@ with tabs[1]:
     
     # 1. زر التحديث (لاحظ المسافة البادئة هنا)
     if st.button("🔄 تحديث قائمة المقررات الرسمية"):
-        # التأكد من وجود بيانات الدخول أولاً
         uid = st.session_state.get("u_id")
         upass = st.session_state.get("u_pass")
         
         if uid and upass:
-            with st.spinner("إيلينا تتواصل مع المودل لجلب موادك..."):
-                # استدعاء الدالة الاحترافية
-                res = run_selenium_task(uid, upass, task_type="timeline")
-                
-                if res and "courses" in res and res["courses"]:
+            with st.spinner("إيلينا تتواصل مع المودل..."):
+                res = run_selenium_task(uid, upass, "timeline")
+                if res and "courses" in res:
                     st.session_state.my_real_courses = res["courses"]
-                    st.session_state.student_name = res.get("student_name", st.session_state.student_name)
+                    st.session_state.student_name = res.get("student_name")
+                    st.session_state.is_synced = True
                     st.success(f"✅ تم العثور على {len(res['courses'])} مواد!")
-                    time.sleep(1)
                     st.rerun()
                 else:
-                    st.warning("⚠️ لم نجد مواد، تأكد من أن حسابك مفتوح في المودل.")
+                    st.error("❌ فشل السحب. تأكد من بياناتك.")
         else:
-            st.error("⚠️ يرجى القيام بالمزامنة أولاً من القائمة الجانبية.")
+            st.warning("⚠️ سجل دخول أولاً من القائمة الجانبية.")
 
     # 2. عرض القائمة المنسدلة (تظهر فقط إذا كانت البيانات موجودة)
-    if "my_real_courses" in st.session_state and st.session_state.my_real_courses:
+    if st.session_state.get("my_real_courses"):
         selected_course = st.selectbox("اختر المادة:", list(st.session_state.my_real_courses.keys()))
+        course_url = st.session_state.my_real_courses[selected_course]
         
-        if st.button(f"استكشاف محتويات: {selected_course}"):
-            with st.spinner(f"جاري الدخول لصفحة {selected_course}..."):
-                course_url = st.session_state.my_real_courses[selected_course]
-                st.session_state.current_course_links = get_course_content(course_url)
+        if st.button("🔍 تصفح المحتوى"):
+                with st.spinner("جاري السحب..."):
+                    res = run_selenium_task(uid, upass, "browse", course_url)
+                    if res and "course_content" in res:
+                        st.session_state.current_course_content = res["course_content"]
+                        st.info("تم السحب! اسأل إيلينا الآن.")
                 # تصفير التلخيصات القديمة عند دخول مادة جديدة
                 st.session_state.summarized_items = [] 
 
@@ -654,62 +657,55 @@ with tabs[2]:
     st.subheader("📊 تقرير الأداء الشامل (كويزات وامتحانات)")
     
     if st.button("🚀 سحب كشف الدرجات التفصيلي", use_container_width=True):
+    uid = st.session_state.get("u_id")
+    upass = st.session_state.get("u_pass")
+    
+    if uid and upass:
         with st.spinner("إيلينا تدخل لدفتر الدرجات..."):
-            try:
-                driver.get("https://moodle.iugaza.edu.ps/grade/report/user/index.php")
-                time.sleep(4)
-                
-                grade_table = driver.find_element(By.CSS_SELECTOR, "table.user-grade")
-                rows = grade_table.find_elements(By.TAG_NAME, "tr")
-                
-                detailed_grades = []
-                for row in rows:
-                    cells = row.find_elements(By.TAG_NAME, "td")
-                    if len(cells) > 1:
-                        # جلب اسم النشاط والدرجة
-                        item_name = row.find_element(By.TAG_NAME, "th").text
-                        grade = cells[0].text 
-                        detailed_grades.append({"النشاط": item_name, "الدرجة": grade})
-                
-                st.session_state.detailed_grades = detailed_grades
+            # بننادي المحرك بتاعنا ونقله بدنا الدرجات للمادة المختارة
+            res = run_selenium_task(uid, upass, "grades", course_url) 
+            
+            if res and "data" in res:
+                # تحويل النص المسحوب لجدول بسيط (أو تخزينه كنص)
+                st.session_state.detailed_grades_text = res["data"]
                 st.success("تم جلب كافة درجات الكويزات والامتحانات!")
-                st.rerun() # تحديث الصفحة لعرض الجدول فوراً
-            except Exception as e:
-                st.error(f"حدث خطأ في سحب التفاصيل: {e}")
+                st.rerun()
+            else:
+                st.error("❌ فشل سحب الدرجات. تأكد أن المادة تحتوي على درجات مرصودة.")
+    else:
+        st.warning("⚠️ سجل دخول أولاً!")
 
-    # --- التعديل هنا: يجب أن يكون الكود مزاحاً للداخل ليكون تابعاً لـ if ---
-    if st.session_state.get("detailed_grades"):
-        st.write("### 📋 كشف الدرجات المكتشف:")
-        st.table(st.session_state.detailed_grades)
-        
-        if st.button("🤖 اطلبي نصيحة إيلينا للتطوير", use_container_width=True):
-            with st.spinner("إيلينا تحلل أداءك الأكاديمي..."):
-                try:
-                    grades_summary = "\n".join([f"- {g['النشاط']}: {g['الدرجة']}" for g in st.session_state.detailed_grades])
-                    
-                    prompt = f"""
-                    هذه درجاتي في الأنشطة والكويزات المختلفة:
-                    {grades_summary}
-                    
-                    بناءً على هذه النتائج، يا إيلينا:
-                    1. قيمي أدائي العام (ممتاز، يحتاج تحسين، إلخ).
-                    2. حددي لي المواد أو الأنشطة التي يبدو أنني أعاني فيها.
-                    3. أعطيني 3 نصائح عملية لأرفع درجاتي في الامتحانات النهائية.
-                    4. كيف يمكنني استغلال نقاط قوتي الموضحة في الدرجات العالية؟
-                    """
-                    
-                    response = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[
-                            {"role": "system", "content": "أنتِ إيلينا، خبيرة في الاستراتيجيات الدراسية والتفوق الأكاديمي."},
-                            {"role": "user", "content": prompt}
-                        ]
-                    )
-                    st.markdown("---")
-                    st.success("📈 **تحليل الأداء من إيلينا:**")
-                    st.write(response.choices[0].message.content)
-                except Exception as e:
-                    st.error(f"خطأ في تحليل الدرجات: {e}")
+# عرض النتائج وتحليل إيلينا
+if st.session_state.get("detailed_grades_text"):
+    st.write("### 📋 كشف الدرجات المكتشف:")
+    st.text_area("الدرجات المسحوبة:", st.session_state.detailed_grades_text, height=200)
+    
+    if st.button("🤖 اطلبي نصيحة إيلينا للتطوير", use_container_width=True):
+        with st.spinner("إيلينا تحلل أداءك الأكاديمي..."):
+            try:
+                prompt = f"""
+                هذه درجاتي المسحوبة من المودل:
+                {st.session_state.detailed_grades_text}
+                
+                بناءً على هذه النتائج، يا إيلينا:
+                1. قيمي أدائي العام.
+                2. حددي لي الأنشطة التي أحتاج للتركيز عليها.
+                3. أعطيني 3 نصائح للامتحان النهائي.
+                """
+                
+                # استدعاء الـ AI (Groq/Llama)
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": "أنتِ إيلينا، خبيرة في الاستراتيجيات الدراسية."},
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                st.markdown("---")
+                st.success("📈 **تحليل الأداء من إيلينا:**")
+                st.write(response.choices[0].message.content)
+            except Exception as e:
+                st.error(f"خطأ في تحليل الدرجات: {e}")
         
 # --- 4. الشات مع إيلينا ---
 with tabs[3]:
@@ -950,6 +946,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
