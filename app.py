@@ -844,37 +844,41 @@ with st.sidebar:
 
     if st.button("🚀 Sync Now", use_container_width=True):
         if uid and upass:
-            with st.spinner("جاري المزامنة..."):
+            with st.spinner("جاري المزامنة وسحب بياناتك من المودل..."):
+                # استدعاء دالة السيلينيوم
                 res = run_selenium_task(uid, upass, "timeline")
+                
                 if res and "courses" in res:
-                    # تخزين البيانات
+                    # تخزين البيانات في الجلسة (Session State)
                     st.session_state.update({
                         "u_id": uid,
                         "u_pass": upass,
                         "my_real_courses": res['courses'],
                         "user_schedule": res.get('timeline_list', []), 
-                        "student_name": res.get('student_name', 'طالب مجتهد'),
+                        "student_name": res.get('student_name', 'مستخدم إيلينا'), # هنا سيظهر اسمك الحقيقي لو السيلينيوم سحبه صح
                         "is_synced": True
                     })
                     
-                    # تحديث العداد
+                    # تحديث عداد المزامنات في قاعدة البيانات
                     try:
                         db = load_db()
                         email_u = st.session_state.get("user_email")
                         if email_u and st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
-                            if email_u not in db: db[email_u] = {}
+                            if email_u not in db: 
+                                db[email_u] = {}
                             db[email_u]["sync_count"] = db[email_u].get("sync_count", 0) + 1
                             save_db(db)
                     except:
                         pass
 
-                    st.success(f"✅ أهلاً {st.session_state.student_name}")
+                    # رسالة النجاح والترحيب بالاسم المسحوب
+                    st.success(f"✅ تم الربط! أهلاً بك يا {st.session_state.student_name}")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("❌ فشلت المزامنة.")
+                    st.error("❌ فشلت المزامنة، يرجى التأكد من صحة بيانات المودل أو المحاولة لاحقاً.")
         else:
-            st.warning("⚠️ أدخل البيانات")
+            st.warning("⚠️ يرجى إدخال الرقم الجامعي وكلمة المرور أولاً.")
 
     st.markdown("---")
     
@@ -897,6 +901,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
