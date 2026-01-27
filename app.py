@@ -832,7 +832,7 @@ with st.sidebar:
                     st.session_state.user_status = "Standard"
                     st.error("⚠️ **انتهى الاشتراك!**\n\nتم تحويل حسابك للوضع العادي.")
                     st.rerun() 
-               except Exception as e:
+                except Exception as e:
                     st.info(f"📅 ينتهي اشتراكك في: {expire_str}")
 
     st.markdown("---")
@@ -896,6 +896,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
