@@ -832,85 +832,70 @@ with st.sidebar:
                     st.session_state.user_status = "Standard"
                     st.error("⚠️ **انتهى الاشتراك!**\n\nتم تحويل حسابك للوضع العادي.")
                     st.rerun() 
-            except Exception as e:
-                st.info(f"📅 ينتهي اشتراكك في: {expire_str}")
+               except Exception as e:
+                    st.info(f"📅 ينتهي اشتراكك في: {expire_str}")
+
+    st.markdown("---")
     
-st.markdown("---")
-st.header("⚙️ المزامنة")
-uid = st.text_input("الرقم الجامعي", value=st.session_state.get("u_id", ""))
-upass = st.text_input("كلمة المرور", type="password", value=st.session_state.get("u_pass", ""))
+    # 2. قسم المزامنة (أصبح الآن داخل السايدبار)
+    st.header("⚙️ المزامنة")
+    uid = st.text_input("الرقم الجامعي", value=st.session_state.get("u_id", ""))
+    upass = st.text_input("كلمة المرور", type="password", value=st.session_state.get("u_pass", ""))
 
-# هذا البلوك يجب أن يكون موازي لـ uid و upass
-if st.button("🚀 Sync Now", use_container_width=True):
-    if uid and upass:
-        with st.spinner("جاري المزامنة وسحب بياناتك من المودل..."):
-            res = run_selenium_task(uid, upass, "timeline")
-            if res and "courses" in res:
-                # تخزين البيانات في الـ Session
-                st.session_state.u_id = uid
-                st.session_state.u_pass = upass
-                st.session_state.my_real_courses = res['courses']
-                st.session_state.user_schedule = res.get('timeline_list', []) 
-                st.session_state.student_name = res.get('student_name', 'طالب مجتهد')
-                st.session_state.is_synced = True
-                
-                try:
-                    db = load_db()
-                    current_u = st.session_state.get("user_email") # تأكد أن هذا المتغير موجود عندك
-                    if current_u and st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
-                        if current_u not in db:
-                            db[current_u] = {}
-                        db[current_u]["sync_count"] = db[current_u].get("sync_count", 0) + 1
-                        save_db(db)
-                except Exception as db_err:
-                    # نكتفي بتحذير بسيط إذا فشل تحديث العداد حتى لا تتعطل المزامنة
-                    print(f"Database update skipped: {db_err}")
+    if st.button("🚀 Sync Now", use_container_width=True):
+        if uid and upass:
+            with st.spinner("جاري المزامنة..."):
+                res = run_selenium_task(uid, upass, "timeline")
+                if res and "courses" in res:
+                    # تخزين البيانات
+                    st.session_state.update({
+                        "u_id": uid,
+                        "u_pass": upass,
+                        "my_real_courses": res['courses'],
+                        "user_schedule": res.get('timeline_list', []), 
+                        "student_name": res.get('student_name', 'طالب مجتهد'),
+                        "is_synced": True
+                    })
+                    
+                    # تحديث العداد
+                    try:
+                        db = load_db()
+                        email_u = st.session_state.get("user_email")
+                        if email_u and st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
+                            if email_u not in db: db[email_u] = {}
+                            db[email_u]["sync_count"] = db[email_u].get("sync_count", 0) + 1
+                            save_db(db)
+                    except: pass
 
-                # 3. رسالة النجاح النهائية
-                st.success(f"✅ تم الربط بنجاح! أهلاً بك يا {st.session_state.student_name}")
-                time.sleep(1) # وقت قصير للمستخدم ليقرأ الرسالة
-                st.rerun()
-            else:
-                st.error("❌ لم نتمكن من جلب البيانات، تأكد من صحة الحساب أو حالة المودل.")
-    else:
-        st.warning("⚠️ يرجى إدخال الرقم الجامعي وكلمة المرور أولاً.")
+                    st.success(f"✅ أهلاً {st.session_state.student_name}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ فشلت المزامنة.")
+        else:
+            st.warning("⚠️ أدخل البيانات")
 
-st.markdown("---")
+    st.markdown("---")
     
-    # --- 1. الـ Expander (تأكد من وجود 4 مسافات قبل with) ---
-with st.expander("⚙️ الإعدادات المتقدمة"):
-    if st.button("🔴 تسجيل الخروج", use_container_width=True):
-        st.components.v1.html(
-            """
-            <script>
-            document.cookie.split(";").forEach(function(c) { 
-                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-            });
-            localStorage.clear();
-            sessionStorage.clear();
-            window.parent.location.href = window.parent.location.origin + window.parent.location.pathname;
-            </script>
-            """,
-            height=0
-        )
-        
-        # مسح الكوكيز والجلسة
-        if 'cookies' in locals():
-            cookies["username"] = ""
-            if "username" in cookies:
-                del cookies["username"]
-            cookies.save()
-        
-        st.session_state.clear()
-        st.session_state["is_logged_in"] = False
-        st.success("تم تسجيل الخروج...")
-        st.stop()
+    # 3. الإعدادات المتقدمة (داخل السايدبار)
+    with st.expander("⚙️ الإعدادات المتقدمة"):
+        if st.button("🔴 تسجيل الخروج", use_container_width=True):
+            st.components.v1.html(
+                """
+                <script>
+                localStorage.clear(); sessionStorage.clear();
+                window.parent.location.href = window.parent.location.origin + window.parent.location.pathname;
+                </script>
+                """, height=0
+            )
+            st.session_state.clear()
+            st.stop()
 
-# كود المطور
-if st.session_state.get("user_role") == "developer":
-    if st.button("🧹 Clear Cache", use_container_width=True):
-        st.cache_data.clear()
-        st.success("تم مسح الكاش!")
+    # 4. كود المطور
+    if st.session_state.get("user_role") == "developer":
+        if st.button("🧹 Clear Cache", use_container_width=True):
+            st.cache_data.clear()
+            st.success("تم مسح الكاش!")
 
 
 
