@@ -652,72 +652,68 @@ with tabs[2]:
 with tabs[3]:
     # لاحظ المسافة البادئة هنا (الإزاحة)
     if "last_summary" in st.session_state or "user_schedule" in st.session_state:
-    st.caption("🤖 إيلينا - مستشارك الأكاديمي الشامل (بذاكرة متصلة)")
-    
-    # 1. تجميع البيانات من النوافذ الأخرى (الذاكرة المركزية)
-    schedule_context = st.session_state.get("user_schedule", "لا يوجد بيانات جدول حالياً.")
-    grades_context = st.session_state.get("detailed_grades", "لا يوجد بيانات علامات حالياً.")
-    last_summary = st.session_state.get("last_summary", "لم يتم تلخيص ملفات مؤخراً.")
+        st.caption("🤖 إيلينا - مستشارك الأكاديمي الشامل (بذاكرة متصلة)")
+        
+        # 1. تجميع البيانات من النوافذ الأخرى (الذاكرة المركزية)
+        schedule_context = st.session_state.get("user_schedule", "لا يوجد بيانات جدول حالياً.")
+        # تأكدنا هنا من استخدام الاسم الصحيح للدرجات
+        grades_context = st.session_state.get("detailed_grades", "لا يوجد بيانات علامات حالياً.")
+        last_summary = st.session_state.get("last_summary", "لم يتم تلخيص ملفات مؤخراً.")
 
-    # 2. إعداد "السياق" اللي رح يروح لـ Groq في كل رسالة
-    instruction = f"""
-    أنتِ إيلينا، مساعدة أكاديمية ذكية وودودة لطلاب الجامعة، مبرمجة بواسطة إيثان.
-    لديكِ وصول كامل لبيانات الطالب الحالية في التطبيق:
-    
-    📅 المخطط الزمني للطالب:
-    {str(schedule_context)}
-    
-    📊 سجل الدرجات التفصيلي:
-    {str(grades_context)}
-    
-    📝 آخر ملخص لمادة دراسية:
-    {str(last_summary)}
-    
-    استخدمي هذه المعلومات للإجابة على أي سؤال. إذا سألك الطالب 'شو علي دراسة؟' أو 'كيف وضعي في المواد؟' استخدمي البيانات أعلاه للرد بدقة دون طلبها منه.
-    كوني مشجعة دائماً وناديه باسمه 'إيثان' عند الحاجة.
-    """
+        # 2. إعداد "السياق" 
+        instruction = f"""
+        أنتِ إيلينا، مساعدة أكاديمية ذكية وودودة لطلاب الجامعة، مبرمجة بواسطة إيثان.
+        لديكِ وصول كامل لبيانات الطالب الحالية في التطبيق:
+        
+        📅 المخطط الزمني للطالب:
+        {str(schedule_context)}
+        
+        📊 سجل الدرجات التفصيلي:
+        {str(grades_context)}
+        
+        📝 آخر ملخص لمادة دراسية:
+        {str(last_summary)}
+        
+        استخدمي هذه المعلومات للإجابة على أي سؤال. إذا سألك الطالب 'شو علي دراسة؟' أو 'كيف وضعي في المواد؟' استخدمي البيانات أعلاه للرد بدقة.
+        ناديه باسمه 'إيثان' دائماً.
+        """
 
-    # التأكد من وجود سجل المحادثة
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+        # تأكد من أن بقية الكود (messages, chat_input) داخل نفس مستوى الإزاحة
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-    # عرض الرسائل السابقة
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        # عرض الرسائل السابقة
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    if chat_input := st.chat_input("اسأل إيلينا عن أي شيء في حسابك..."):
-        # حفظ رسالة المستخدم
-        st.session_state.messages.append({"role": "user", "content": chat_input})
-        with st.chat_message("user"):
-            st.markdown(chat_input)
+        if chat_input := st.chat_input("اسأل إيلينا عن أي شيء في حسابك..."):
+            st.session_state.messages.append({"role": "user", "content": chat_input})
+            with st.chat_message("user"):
+                st.markdown(chat_input)
 
-        # طلب الرد من Groq مع "الذاكرة الكاملة"
-        with st.chat_message("assistant"):
-            try:
-                with st.spinner("إيلينا تحلل بياناتك وتكتب... ✍️"):
-                    # نرسل الـ instruction كأول رسالة دائماً (System Message)
-                    full_messages = [
-                        {"role": "system", "content": instruction},
-                        *st.session_state.messages
-                    ]
-                    
-                    chat_completion = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile", 
-                        messages=full_messages,
-                    )
-                    response_text = chat_completion.choices[0].message.content
-                    st.markdown(response_text)
-                    
-                    # حفظ رد المساعد
-                    st.session_state.messages.append({"role": "assistant", "content": response_text})
-            except Exception as e:
-                st.error(f"عذراً، حدث خطأ في الاتصال: {e}")
+            with st.chat_message("assistant"):
+                try:
+                    with st.spinner("إيلينا تحلل بياناتك وتكتب... ✍️"):
+                        full_messages = [
+                            {"role": "system", "content": instruction},
+                            *st.session_state.messages
+                        ]
+                        
+                        chat_completion = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile", 
+                            messages=full_messages,
+                        )
+                        response_text = chat_completion.choices[0].message.content
+                        st.markdown(response_text)
+                        st.session_state.messages.append({"role": "assistant", "content": response_text})
+                except Exception as e:
+                    st.error(f"عذراً، حدث خطأ في الاتصال: {e}")
 
-    # زر لمسح الذاكرة إذا أراد الطالب البدء من جديد
-    if st.button("🗑️ مسح محادثة إيلينا"):
-        st.session_state.messages = []
-        st.rerun()
+        # زر مسح الذاكرة
+        if st.button("🗑️ مسح محادثة إيلينا"):
+            st.session_state.messages = []
+            st.rerun()
                 
 # --- 5. لوحة التحكم (المطور فقط) ---
 with tabs[4]:
@@ -895,6 +891,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
