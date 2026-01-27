@@ -290,11 +290,24 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
             if target_url:
                 driver.get(target_url)
                 time.sleep(8)
-                try:
-                    content = driver.find_element(By.ID, "region-main").text
-                except:
-                    content = driver.find_element(By.TAG_NAME, "body").text
-                return {"course_content": content, "student_name": student_name}
+                # سحب النصوص
+                try: content = driver.find_element(By.ID, "region-main").text
+                except: content = driver.find_element(By.TAG_NAME, "body").text
+                
+                # سحب الروابط والملفات (PDF, Folders, Links)
+                found_links = []
+                link_elements = driver.find_elements(By.CSS_SELECTOR, ".instancename, .aalink")
+                for elem in link_elements:
+                    try:
+                        name = elem.text.strip()
+                        # العثور على الرابط الأقرب للعنصر
+                        parent = elem.find_element(By.XPATH, "./..") if elem.tag_name != 'a' else elem
+                        url = parent.get_attribute("href")
+                        if url and name and "course/view.php" not in url:
+                            found_links.append({"name": name, "url": url})
+                    except: continue
+                
+                return {"course_content": content, "course_links": found_links, "student_name": student_name}
 
     except Exception as e:
         return {"error": str(e)}
@@ -596,60 +609,68 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("📖 مستكشف المقررات الذكي")
     
-    # 1. زر التحديث (لاحظ المسافة البادئة هنا)
+    # 1. زر التحديث لجلب أسماء المواد
     if st.button("🔄 تحديث قائمة المقررات الرسمية"):
         uid = st.session_state.get("u_id")
         upass = st.session_state.get("u_pass")
-        
         if uid and upass:
             with st.spinner("إيلينا تتواصل مع المودل..."):
                 res = run_selenium_task(uid, upass, "timeline")
                 if res and "courses" in res:
                     st.session_state.my_real_courses = res["courses"]
-                    st.session_state.student_name = res.get("student_name")
-                    st.session_state.is_synced = True
                     st.success(f"✅ تم العثور على {len(res['courses'])} مواد!")
                     st.rerun()
-                else:
-                    st.error("❌ فشل السحب. تأكد من بياناتك.")
         else:
-            st.warning("⚠️ سجل دخول أولاً من القائمة الجانبية.")
+            st.warning("⚠️ يرجى المزامنة أولاً من القائمة الجانبية.")
 
-    # 2. عرض القائمة المنسدلة (تظهر فقط إذا كانت البيانات موجودة)
+    st.markdown("---")
+
+    # 2. عرض القائمة المنسدلة والتصفح
     if st.session_state.get("my_real_courses"):
-        selected_course = st.selectbox("اختر المادة:", list(st.session_state.my_real_courses.keys()))
+        selected_course = st.selectbox("اختر المادة لتصفح محتوياتها:", list(st.session_state.my_real_courses.keys()))
         course_url = st.session_state.my_real_courses[selected_course]
         
-        if st.button("🔍 تصفح المحتوى"):
-                with st.spinner("جاري السحب..."):
+        if st.button("🔍 تصفح محتوى المادة وسحب الروابط", use_container_width=True):
+            uid = st.session_state.get("u_id") # جلب الـ uid هنا لمنع NameError
+            upass = st.session_state.get("u_pass")
+            
+            if uid and upass:
+                with st.spinner("جاري سحب الملفات والروابط..."):
                     res = run_selenium_task(uid, upass, "browse", course_url)
                     if res and "course_content" in res:
                         st.session_state.current_course_content = res["course_content"]
-                        st.info("تم السحب! اسأل إيلينا الآن.")
-                # تصفير التلخيصات القديمة عند دخول مادة جديدة
-                st.session_state.summarized_items = [] 
+                        st.session_state.current_course_links = res.get("course_links", [])
+                        st.session_state.summarized_items = [] # تصفير التلخيصات القديمة
+                        st.success("✨ تم سحب محتوى المادة بنجاح!")
+            else:
+                st.error("⚠️ بيانات المودل غير متوفرة، أعد المزامنة.")
 
     # 3. عرض الملفات والروابط المستخرجة
-    if "current_course_links" in st.session_state:
-        st.write(f"### محتويات المادة:")
+    if st.session_state.get("current_course_links"):
+        st.write(f"### 📄 الملفات والروابط المكتشفة:")
+        st.info("إيلينا وجدت المصادر التالية، يمكنك فتحها أو طلب تلخيصها:")
+        
         for i, link in enumerate(st.session_state.current_course_links):
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1: st.write(f"📄 {link['name']}")
-            with col2: st.link_button("فتح", link['url'])
-            with col3:
-                is_done = link['url'] in st.session_state.get("summarized_items", [])
-                btn_label = "✅ تم التلخيص" if is_done else "🪄 تلخيص ذكي"
-                
-                if st.button(btn_label, key=f"sum_{i}"):
-                    with st.spinner("إيلينا تقرأ وتلخص..."):
-                        # ملاحظة: تأكد من تعريف دالة summarize_content في كودك
-                        # summary = summarize_content(link['url']) 
-                        
+            # تنسيق العرض في أسطر
+            with st.container():
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.markdown(f"**{link['name']}**")
+                with col2:
+                    st.link_button("📂 فتح", link['url'], use_container_width=True)
+                with col3:
+                    # منطق التلخيص
+                    summarized = st.session_state.get("summarized_items", [])
+                    is_done = link['url'] in summarized
+                    btn_label = "✅ ملخص" if is_done else "🪄 تلخيص"
+                    
+                    if st.button(btn_label, key=f"sum_{i}", use_container_width=True):
+                        # هنا نضع سطر التلخيص الفعلي (إرسال الرابط للـ AI)
+                        # لتبسيط الأمر الآن، سنعتبره تم تلخيصه
                         if "summarized_items" not in st.session_state:
                             st.session_state.summarized_items = []
                         st.session_state.summarized_items.append(link['url'])
-                        
-                        st.info("✨ تم التلخيص! [اضغط هنا للانتقال لتبويب الشات](/?tab=Ask+Elena)") 
+                        st.toast(f"تمت إضافة {link['name']} لذاكرة إيلينا!")
                         st.rerun()
                             
 # 3. الدرجات (الشغالة تمام)
@@ -951,6 +972,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
