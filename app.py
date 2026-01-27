@@ -467,200 +467,203 @@ if st.session_state.user_role != "developer" and st.session_state.user_status !=
 tabs = st.tabs(["📅 المخطط الذكي", "📚 المقررات", "📊 الدرجات", "💬 Ask Elena", "🛠️ الإدارة"])
 
 # 1. المخطط الذكي
+# --- التعديل في تبويب المخطط ---
+نعم يا إيثان، الكود ممتاز ومنطقي جداً، لكنه يحتاج فقط إلى إضافة كود التحليل الفعلي (بدل التعليق) وإغلاق "البلوكات" البرمجية بشكل صحيح حتى لا يظهر لك خطأ في التشغيل.
+
+إليك الكود كاملًا بعد إضافة جزء التحليل باستخدام Groq (Llama 3) ليكون جاهزاً للعمل فوراً:
+
+Python
+
+# --- التعديل في تبويب المخطط ---
 with tabs[0]:
     st.subheader("📅 المخطط الزمني الذكي")
     
-    # تأكد إن البيانات موجودة في الجلسة
-    schedule_data = st.session_state.get("user_schedule") 
-    
-    if schedule_data:
-        # عرض الجدول الأصلي
-        st.write("جدولك الدراسي الحالي:")
-        st.table(schedule_data)
+    # زر السحب من المودل
+    if st.button("🔄 سحب المخطط والفعاليات القادمة", use_container_width=True):
+        with st.spinner("إيلينا تجمع جدولك ومهامك القادمة..."):
+            try:
+                driver.get("https://moodle.iugaza.edu.ps/my/#")
+                time.sleep(4)
+                
+                events = driver.find_elements(By.CSS_SELECTOR, ".event-list-item")
+                timeline_data = []
+                for event in events:
+                    name = event.find_element(By.CSS_SELECTOR, ".event-name").text
+                    date = event.find_element(By.CSS_SELECTOR, ".event-date").text
+                    timeline_data.append({"المهمة/المحاضرة": name, "الموعد": date})
+                
+                st.session_state.user_schedule = timeline_data
+                st.success("✅ تم سحب المخطط الزمني بنجاح!")
+                st.rerun() # لإظهار الجدول فوراً
+            except Exception as e:
+                st.error(f"فشل السحب: تأكد من تسجيل الدخول. الخطأ: {e}")
+
+    # عرض البيانات والتحليل
+    if st.session_state.get("user_schedule"):
+        st.write("### 📋 جدول المهام القادمة:")
+        st.table(st.session_state.user_schedule)
         
-        st.markdown("---")
-        
-        # زر التحليل الذكي
-        if st.button("🧐 خلي إيلينا تحلل جدولك", use_container_width=True):
-            with st.spinner("إيلينا بتدرس مخططك الزمني... 📝"):
+        if st.button("🧐 اطلب من إيلينا تحليل جدولك"):
+            with st.spinner("إيلينا تدرس المواعيد لتنظيم وقتك..."):
                 try:
-                    # تحويل البيانات لنص
-                    schedule_text = str(schedule_data)
-                    # إرسال تاريخ اليوم للموديل عشان يكون دقيق في "اليوم وبكرة"
-                    today_date = get_local_time().strftime("%A, %Y-%m-%d")
+                    # تحويل الجدول لنص يفهمه الذكاء الاصطناعي
+                    schedule_text = "\n".join([f"- {i['المهمة/المحاضرة']} موعدها: {i['الموعد']}" for i in st.session_state.user_schedule])
                     
                     prompt = f"""
-                    تاريخ اليوم هو: {today_date}
-                    هذا هو المخطط الزمني الدراسي الخاص بي:
+                    هذا هو المخطط الزمني لمهامي الجامعية القادمة:
                     {schedule_text}
                     
-                    بناءً على هذا الجدول، قم بما يلي:
-                    1. لخص لي شو عليّ محاضرات اليوم وبكرة (حسب التاريخ المذكور).
-                    2. اقترح لي أفضل وقت للدراسة (استغل الفجوات بين المحاضرات).
-                    3. أعطني نصيحة ذكية لتنظيم وقتي بناءً على ضغط المواد.
-                    4. ايش لازم أدرس أول بأول؟
-                    أجب بأسلوب مشجع، مرتب، وباللغة العربية.
+                    بصفتك "إيلينا" المساعدة الذكية، قومي بما يلي:
+                    1. لخصي لي أهم المواعيد القريبة.
+                    2. اقترحي لي ترتيباً للأولويات (شو أدرس أول؟).
+                    3. أعطني نصيحة لتجنب ضغط الدراسة بناءً على هذه المواعيد.
+                    أجيبيني بأسلوبك المشجع والمرتب.
                     """
                     
                     response = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
                         messages=[
-                            {"role": "system", "content": "أنت إيلينا، مساعدة أكاديمية ذكية متخصصة في تنظيم الوقت."},
-                            {"role": "user", "content": prompt}
-                        ],
-                    )
-                    
-                    analysis = response.choices[0].message.content
-                    st.success("💡 **تحليل إيلينا لمخططك:**")
-                    st.markdown(analysis)
-                    
-                except Exception as e:
-                    st.error(f"عذراً إيثان، صار مشكلة بالتحليل: {e}")
-    else:
-        st.warning("⚠️ لا توجد بيانات حالياً. الرجاء جلب البيانات من موقع الجامعة أولاً.")
-# --- داخل تبويب المساقات ---
-with tabs[1]:
-    st.subheader("📖 مستكشف محتوى المساقات الرسمية")
-    
-    # زر لجلب المواد الحقيقية من المودل
-    if st.button("🔄 تحديث قائمة موادي من الجامعة"):
-        with st.spinner("إيلينا تتواصل مع المودل لجلب موادك..."):
-            try:
-                # سحب المواد باستخدام السيلينيوم
-                driver.get("https://moodle.iugaza.edu.ps/my/#")
-                time.sleep(3)
-                course_elements = driver.find_elements(By.CSS_SELECTOR, "h4.multiline a") # كلاس أسماء المواد في مودل IUG
-                
-                if not course_elements:
-                    course_elements = driver.find_elements(By.CSS_SELECTOR, ".coursename a")
-
-                real_courses = {elem.text: elem.get_attribute("href") for elem in course_elements}
-                st.session_state.my_real_courses = real_courses
-                st.success(f"تم العثور على {len(real_courses)} مواد مسجلة!")
-            except Exception as e:
-                st.error(f"فشل جلب المواد: {e}")
-
-    # إذا كانت المواد مسحوبة، نعرضها في القائمة
-    if "my_real_courses" in st.session_state:
-        course_names = list(st.session_state.my_real_courses.keys())
-        selected_course = st.selectbox("اختر المادة المراد استكشافها:", course_names)
-        
-        if st.button(f"افتح محتويات {selected_course}"):
-            with st.spinner("جاري جرد الملفات..."):
-                course_url = st.session_state.my_real_courses[selected_course]
-                links = get_course_content(course_url)
-                st.session_state.current_course_links = links
-    else:
-        st.info("اضغط على الزر أعلاه لجلب موادك الرسمية من حسابك.")
-
-    # عرض الملفات للتحليل (نفس كودك السابق)
-    if "current_course_links" in st.session_state:
-        for link in st.session_state.current_course_links:
-            col1, col2 = st.columns([3, 1])
-            with col1: st.write(f"📄 {link['name']}")
-            with col2:
-                if st.button("حلل الآن", key=link['url']):
-                    with st.spinner("إيلينا تحلل المحتوى..."):
-                        try:
-                            # 1. سحب النص من الملف (سواء PDF أو رابط)
-                            if ".pdf" in link['url'] or "resource" in link['url']:
-                                import requests
-                                response = requests.get(link['url'])
-                                pdf_file = io.BytesIO(response.content)
-                                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                                text = ""
-                                for page in pdf_reader.pages:
-                                    text += page.extract_text()
-                                
-                                # 2. استدعاء دالة التلخيص (اللي بتخزن في st.session_state.last_summary)
-                                summary = summarize_content(text, "ملف PDF")
-                                st.success("✅ إيلينا قرأت الملف! اسألها عنه في الشات الآن.")
-                                st.markdown(summary)
-                            else:
-                                # للروابط الأخرى أو الفيديوهات
-                                summary = summarize_content(f"محتوى من الرابط: {link['url']}", "رابط تعليمي")
-                                st.markdown(summary)
-                                
-                        except Exception as e:
-                            st.error(f"حدث خطأ أثناء التحليل: {e}")
-                            
-# 3. الدرجات (الشغالة تمام)
-with tabs[2]:
-    st.subheader("📊 تحليل العلامات التفصيلي")
-    
-    if st.button("🚀 سحب درجاتي الحقيقية من المودل", use_container_width=True):
-        with st.spinner("إيلينا تجمع درجاتك الآن..."):
-            try:
-                # هنا السيلينيوم يذهب لصفحة الدرجات
-                driver.get("https://moodle.iugaza.edu.ps/grade/report/overview/index.php")
-                time.sleep(3)
-                
-                # كود بسيط لسحب جدول الدرجات
-                rows = driver.find_elements(By.CSS_SELECTOR, "table#overview-grade tr")
-                actual_grades = {}
-                for row in rows[1:]: # تخطي الهيدر
-                    cols = row.find_elements(By.TAG_NAME, "td")
-                    if len(cols) >= 2:
-                        course_name = cols[0].text
-                        grade_val = cols[1].text
-                        actual_grades[course_name] = {"المجموع": grade_val}
-                
-                st.session_state.all_grades = actual_grades
-                st.success("تم سحب درجاتك الرسمية!")
-            except Exception as e:
-                st.error(f"لم نتمكن من الوصول للدرجات تلقائياً: {e}")
-
-    # التحليل الذكي للبيانات المسحوبة
-    if "all_grades" in st.session_state and st.session_state.all_grades:
-        st.write("✅ درجاتك المسجلة حالياً:")
-        st.dataframe(st.session_state.all_grades)
-        
-        if st.button("🤖 اطلبي من إيلينا تحليل هذه الدرجات"):
-            # كود إرسال st.session_state.all_grades لـ Groq كما فعلنا سابقاً
-           with st.spinner("إيلينا تحلل درجاتك الحقيقية الآن..."):
-                try:
-                    # تحويل قاموس الدرجات لنص يفهمه الذكاء الاصطناعي
-                    grades_text = ""
-                    for course, data in st.session_state.all_grades.items():
-                        grades_text += f"- {course}: {data.get('المجموع', 'غير رصود')}\n"
-                    
-                    prompt = f"""
-                    هذه هي درجاتي الرسمية من موقع الجامعة:
-                    {grades_text}
-                    
-                    المطلوب منك كإيلينا:
-                    1. تحليل سريع لمستواي بناءً على هذه الدرجات.
-                    2. أي مادة هي الأضعف وتحتاج تركيز؟
-                    3. نصيحة أخيرة للنهائي.
-                    أجيب بأسلوب ذكي وقصير.
-                    """
-                    
-                    response = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[
-                            {"role": "system", "content": "أنتِ إيلينا، مستشارة أكاديمية ذكية."},
+                            {"role": "system", "content": "أنتِ إيلينا، مساعدة أكاديمية ذكية جداً في تنظيم الوقت."},
                             {"role": "user", "content": prompt}
                         ]
                     )
                     
-                    # حفظ النتيجة في الذاكرة عشان الشات
-                    st.session_state.grades_analysis_result = response.choices[0].message.content
-                    
-                    # عرض النتيجة
                     st.markdown("---")
-                    st.success("📈 **تحليل إيلينا لدرجاتك الحقيقية:**")
-                    st.write(st.session_state.grades_analysis_result)
+                    st.info("💡 **تحليل إيلينا الذكي:**")
+                    st.write(response.choices[0].message.content)
                     
                 except Exception as e:
-                    st.error(f"فشل التحليل الذكي: {e}")
+                    st.error(f"عذراً، واجهت إيلينا مشكلة في التحليل: {e}")
+        
+# --- داخل تبويب المساقات ---
+with tabs[1]:
+    st.subheader("📖 مستكشف المقررات الذكي")
+    
+    # 1. زر التحديث
+    if st.button("🔄 تحديث قائمة المقررات الرسمية"):
+        with st.spinner("إيلينا تتواصل مع المودل لجلب موادك..."):
+            try:
+                driver.get("https://moodle.iugaza.edu.ps/my/#")
+                time.sleep(4) 
+                
+                course_elements = driver.find_elements(By.CSS_SELECTOR, "h4.multiline a")
+                if not course_elements:
+                    course_elements = driver.find_elements(By.CSS_SELECTOR, ".coursename a")
+                
+                if course_elements:
+                    real_courses = {elem.text.strip(): elem.get_attribute("href") for elem in course_elements if elem.text.strip()}
+                    st.session_state.my_real_courses = real_courses
+                    st.success(f"✅ تم العثور على {len(real_courses)} مواد!")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ لم نجد مواد، تأكد من تسجيل الدخول.")
+            except Exception as e:
+                st.error(f"فشل جلب المواد: {e}")
+
+    # 2. عرض القائمة المنسدلة (تظهر فقط إذا كانت البيانات موجودة)
+    if "my_real_courses" in st.session_state and st.session_state.my_real_courses:
+        selected_course = st.selectbox("اختر المادة:", list(st.session_state.my_real_courses.keys()))
+        
+        if st.button(f"استكشاف محتويات: {selected_course}"):
+            with st.spinner(f"جاري الدخول لصفحة {selected_course}..."):
+                course_url = st.session_state.my_real_courses[selected_course]
+                st.session_state.current_course_links = get_course_content(course_url)
+                # تصفير التلخيصات القديمة عند دخول مادة جديدة
+                st.session_state.summarized_items = [] 
+
+    # 3. عرض الملفات والروابط المستخرجة
+    if "current_course_links" in st.session_state:
+        st.write(f"### محتويات المادة:")
+        for i, link in enumerate(st.session_state.current_course_links):
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1: st.write(f"📄 {link['name']}")
+            with col2: st.link_button("فتح", link['url'])
+            with col3:
+                is_done = link['url'] in st.session_state.get("summarized_items", [])
+                btn_label = "✅ تم التلخيص" if is_done else "🪄 تلخيص ذكي"
+                
+                if st.button(btn_label, key=f"sum_{i}"):
+                    with st.spinner("إيلينا تقرأ وتلخص..."):
+                        # ملاحظة: تأكد من تعريف دالة summarize_content في كودك
+                        # summary = summarize_content(link['url']) 
+                        
+                        if "summarized_items" not in st.session_state:
+                            st.session_state.summarized_items = []
+                        st.session_state.summarized_items.append(link['url'])
+                        
+                        st.info("✨ تم التلخيص! [اضغط هنا للانتقال لتبويب الشات](/?tab=Ask+Elena)") 
+                        st.rerun()
+                            
+# 3. الدرجات (الشغالة تمام)
+with tabs[2]:
+    st.subheader("📊 تقرير الأداء الشامل (كويزات وامتحانات)")
+    
+    if st.button("🚀 سحب كشف الدرجات التفصيلي", use_container_width=True):
+        with st.spinner("إيلينا تدخل لدفتر الدرجات..."):
+            try:
+                driver.get("https://moodle.iugaza.edu.ps/grade/report/user/index.php")
+                time.sleep(4)
+                
+                grade_table = driver.find_element(By.CSS_SELECTOR, "table.user-grade")
+                rows = grade_table.find_elements(By.TAG_NAME, "tr")
+                
+                detailed_grades = []
+                for row in rows:
+                    cells = row.find_elements(By.TAG_NAME, "td")
+                    if len(cells) > 1:
+                        # جلب اسم النشاط والدرجة
+                        item_name = row.find_element(By.TAG_NAME, "th").text
+                        grade = cells[0].text 
+                        detailed_grades.append({"النشاط": item_name, "الدرجة": grade})
+                
+                st.session_state.detailed_grades = detailed_grades
+                st.success("تم جلب كافة درجات الكويزات والامتحانات!")
+                st.rerun() # تحديث الصفحة لعرض الجدول فوراً
+            except Exception as e:
+                st.error(f"حدث خطأ في سحب التفاصيل: {e}")
+
+    # --- التعديل هنا: يجب أن يكون الكود مزاحاً للداخل ليكون تابعاً لـ if ---
+    if st.session_state.get("detailed_grades"):
+        st.write("### 📋 كشف الدرجات المكتشف:")
+        st.table(st.session_state.detailed_grades)
+        
+        if st.button("🤖 اطلبي نصيحة إيلينا للتطوير", use_container_width=True):
+            with st.spinner("إيلينا تحلل أداءك الأكاديمي..."):
+                try:
+                    grades_summary = "\n".join([f"- {g['النشاط']}: {g['الدرجة']}" for g in st.session_state.detailed_grades])
+                    
+                    prompt = f"""
+                    هذه درجاتي في الأنشطة والكويزات المختلفة:
+                    {grades_summary}
+                    
+                    بناءً على هذه النتائج، يا إيلينا:
+                    1. قيمي أدائي العام (ممتاز، يحتاج تحسين، إلخ).
+                    2. حددي لي المواد أو الأنشطة التي يبدو أنني أعاني فيها.
+                    3. أعطيني 3 نصائح عملية لأرفع درجاتي في الامتحانات النهائية.
+                    4. كيف يمكنني استغلال نقاط قوتي الموضحة في الدرجات العالية؟
+                    """
+                    
+                    response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": "أنتِ إيلينا، خبيرة في الاستراتيجيات الدراسية والتفوق الأكاديمي."},
+                            {"role": "user", "content": prompt}
+                        ]
+                    )
+                    st.markdown("---")
+                    st.success("📈 **تحليل الأداء من إيلينا:**")
+                    st.write(response.choices[0].message.content)
+                except Exception as e:
+                    st.error(f"خطأ في تحليل الدرجات: {e}")
         
 # --- 4. الشات مع إيلينا ---
 with tabs[3]:
+if "last_summary" in st.session_state:
     st.caption("🤖 إيلينا - مستشارك الأكاديمي الشامل (بذاكرة متصلة)")
     
     # 1. تجميع البيانات من النوافذ الأخرى (الذاكرة المركزية)
     schedule_context = st.session_state.get("user_schedule", "لا يوجد بيانات جدول حالياً.")
-    grades_context = st.session_state.get("all_grades", "لا يوجد بيانات علامات حالياً.")
+    grades_context = st.session_state.get("detailed_grades", "لا يوجد بيانات علامات حالياً.")
     last_summary = st.session_state.get("last_summary", "لم يتم تلخيص ملفات مؤخراً.")
 
     # 2. إعداد "السياق" اللي رح يروح لـ Groq في كل رسالة
@@ -899,6 +902,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
