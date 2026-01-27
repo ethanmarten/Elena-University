@@ -828,15 +828,24 @@ with st.sidebar:
     
     if st.button("🚀 Sync Now", use_container_width=True):
         if uid and upass:
-            with st.spinner("جاري المزامنة... انتظر قليلاً"):
+            with st.spinner("جاري الاتصال وسحب بياناتك الشخصية..."):
                 res = run_selenium_task(uid, upass, "timeline")
-                if "courses" in res:
+                
+                if res and "courses" in res:
+                    # نفترض أن الدالة رجعت اسم الطالب في متغير اسمه full_name
+                    student_name = res.get('student_name', 'إيثان') 
+                    
                     st.session_state.update({
-                        "courses": res['courses'], 
-                        "timeline_data": res['text'], 
+                        "student_name": student_name, # تخزين الاسم هنا مهم جداً
+                        "my_real_courses": res['courses'], 
+                        "user_schedule": res.get('text', []),
                         "u_id": uid, 
-                        "u_pass": upass
+                        "u_pass": upass,
+                        "is_synced": True # علامة نجاح المزامنة
                     })
+                    
+                    st.success(f"✅ تم الربط بحسابك بنجاح يا {student_name}!")
+                    st.rerun()
                     
                     # تحديث عداد المزامنات (فقط للمستخدم العادي)
                     db = load_db()
@@ -889,6 +898,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
