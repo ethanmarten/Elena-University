@@ -1047,26 +1047,28 @@ with st.sidebar:
     # 3. الإعدادات المتقدمة
     # 3. الإعدادات المتقدمة
     with st.expander("⚙️ الإعدادات المتقدمة"):
-        if st.button("🔴 تسجيل الخروج", use_container_width=True):
-            # 1. قائمة بالمفاتيح اللي بدنا نصفرها (عشان ما يضرب التطبيق)
-            keys_to_reset = [
-                "u_id", "u_pass", "logged_in", "user_role", 
-                "my_real_courses", "user_schedule", 
-                "detailed_grades_text", "messages", "pdf_memories"
-            ]
+        if st.button("🔴 تسجيل الخروج النهائي", use_container_width=True):
+            # 1. تصفير الـ Session State في السيرفر
+            st.session_state.clear()
             
-            for key in keys_to_reset:
-                if key in st.session_state:
-                    st.session_state[key] = None if key != "messages" else []
-
-            # 2. إجبار التطبيق على العودة لحالة "غير مسجل دخول"
-            st.session_state["logged_in"] = False
+            # 2. الضربة القاضية: مسح الـ localStorage من متصفحك وإعادة تحميل الصفحة
+            st.components.v1.html(
+                """
+                <script>
+                    // مسح كل البيانات المخزنة في المتصفح (الخزنة الدائمة)
+                    window.parent.localStorage.clear();
+                    window.parent.sessionStorage.clear();
+                    
+                    // إجبار المتصفح على العودة للصفحة الرئيسية بدون أي بيانات قديمة
+                    window.parent.location.reload();
+                </script>
+                """,
+                height=0,
+            )
             
-            st.success("تم تسجيل الخروج.. جاري العودة للرئيسية")
-            
-            # 3. إعادة التشغيل
-            st.rerun()
-
+            # 3. التوقف عن تنفيذ أي كود إضافي
+            st.success("جاري تسجيل الخروج وتنظيف المتصفح...")
+            st.stop()
     # 4. كود المطور
     # تأكد إنك بتخزن الـ user_role في الـ session_state عند تسجيل الدخول
     if st.session_state.get("user_role") == "developer":
@@ -1074,6 +1076,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
