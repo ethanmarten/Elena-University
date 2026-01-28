@@ -1048,14 +1048,23 @@ with st.sidebar:
     # 3. الإعدادات المتقدمة
     with st.expander("⚙️ الإعدادات المتقدمة"):
         if st.button("🔴 تسجيل الخروج", use_container_width=True):
-            # تصفير كل البيانات المخزنة في الجلسة
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
+            # 1. قائمة بالمفاتيح اللي بدنا نصفرها (عشان ما يضرب التطبيق)
+            keys_to_reset = [
+                "u_id", "u_pass", "logged_in", "user_role", 
+                "my_real_courses", "user_schedule", 
+                "detailed_grades_text", "messages", "pdf_memories"
+            ]
             
-            # عرض رسالة نجاح سريعة قبل إعادة التحميل
-            st.success("تم تسجيل الخروج بنجاح.. جاري إعادة التحميل")
+            for key in keys_to_reset:
+                if key in st.session_state:
+                    st.session_state[key] = None if key != "messages" else []
+
+            # 2. إجبار التطبيق على العودة لحالة "غير مسجل دخول"
+            st.session_state["logged_in"] = False
             
-            # إعادة تشغيل التطبيق ليعود لنقطة الصفر (شاشة تسجيل الدخول)
+            st.success("تم تسجيل الخروج.. جاري العودة للرئيسية")
+            
+            # 3. إعادة التشغيل
             st.rerun()
 
     # 4. كود المطور
@@ -1065,6 +1074,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش!")
+
 
 
 
