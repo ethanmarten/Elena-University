@@ -37,34 +37,27 @@ if not cookies.ready():
 if "driver" not in st.session_state:
     with st.spinner("جاري تهيئة إيلينا على السيرفر السحابي... 👑"):
         options = Options()
-        options.add_argument('--headless') # ضروري جداً على السيرفر
+        options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
         
-        # --- الفحص الذكي للمسارات (Render vs Streamlit) ---
-        # مسار Render (اللي نزلناه بالسكريبت)
         render_chrome = "/opt/render/project/.render/chrome/opt/google/chrome/google-chrome"
-        # مسار Streamlit الافتراضي
-        streamlit_chrome = "/usr/bin/chromium"
         
         if os.path.exists(render_chrome):
             options.binary_location = render_chrome
-            # في ريندر نستخدم الدرايفر العادي
-            chrome_type = ChromeType.GOOGLE
+            # الحل الجديد: لا نستخدم ChromeDriverManager يدوياً
+            # السيلينيوم 4.10+ سيقوم بالبحث عن الدرايفر المناسب تلقائياً
+            try:
+                st.session_state.driver = webdriver.Chrome(options=options)
+                st.success("✅ تم الربط مع كروم 144 بنجاح!")
+            except Exception as e:
+                st.error(f"❌ محاولة الربط التلقائي فشلت، نجرب الطريقة البديلة: {e}")
         else:
-            options.binary_location = streamlit_chrome
-            # في ستريم ليت نستخدم نسخة كروميوم
-            chrome_type = ChromeType.CHROMIUM
-
-        try:
-            # تثبيت الدرايفر المناسب تلقائياً بناءً على النوع المكتشف
-            service = Service(ChromeDriverManager(chrome_type=chrome_type).install())
+            # إعدادات ستريم ليت الافتراضية
+            options.binary_location = "/usr/bin/chromium"
+            service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
             st.session_state.driver = webdriver.Chrome(service=service, options=options)
-            st.success("✅ إيلينا متصلة وجاهزة للعمل!")
-        except Exception as e:
-            st.error(f"❌ فشل تشغيل المتصفح: {e}")
-            st.info("نصيحة: تأكد من وجود ملف render-build.sh لو كنت تستخدم Render.")
             
 # الجسر لضمان تعريف كلمة driver في كل الملف
 driver = st.session_state.get("driver")
@@ -1151,6 +1144,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache (Developer Only)", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش بنجاح!")
+
 
 
 
