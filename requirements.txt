@@ -6,3 +6,5 @@ pytz
 PyPDF2
 requests
 streamlit-cookies-manager
+youtube-transcript-api
+
