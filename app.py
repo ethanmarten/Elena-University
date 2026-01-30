@@ -63,37 +63,62 @@ if "driver" not in st.session_state:
 driver = st.session_state.get("driver")
 
 def get_course_content(course_url):
-    # نتحقق أولاً هل المتصفح شغال؟
     if "driver" not in st.session_state:
         st.error("⚠️ المتصفح غير جاهز!")
         return []
         
-    local_driver = st.session_state.driver # استخدام الدرايفر من الجلسة
+    local_driver = st.session_state.driver 
     
     try:
-        # 1. الدخول لرابط المادة المحدد باستخدام local_driver
         local_driver.get(course_url)
-        time.sleep(4) 
+        time.sleep(5) # زدنا الوقت شوي عشان المودل بطيء في التحميل
         
         links_found = []
         
-        # 2. البحث عن الروابط
-        elements = local_driver.find_elements(By.CSS_SELECTOR, "div.activityinstance a")
+        # 1. البحث عن حاويات الأنشطة في المودل (الطريقة الأدق)
+        activities = local_driver.find_elements(By.CSS_SELECTOR, "li.activity")
         
-        if not elements: 
-            elements = local_driver.find_elements(By.TAG_NAME, "a")
+        for activity in activities:
+            try:
+                # جلب الرابط والنص والأيقونة
+                link_elem = activity.find_element(By.TAG_NAME, "a")
+                href = link_elem.get_attribute("href")
+                text = link_elem.text.replace("رابط", "").replace("ملف", "").strip()
+                
+                # فحص نوع النشاط من خلال الكلاسات (مودل بيحدد النوع في كلاس الـ li)
+                activity_class = activity.get_attribute("class")
+                
+                content_type = "رابط/ملف" # النوع الافتراضي
+                
+                if "resource" in activity_class or ".pdf" in href.lower():
+                    content_type = "📄 ملف دراسي"
+                elif "url" in activity_class or "video" in href.lower() or "youtube" in href.lower():
+                    content_type = "🎥 فيديو / رابط"
+                elif "assign" in activity_class:
+                    content_type = "📝 تكليف / واجب"
+                elif "folder" in activity_class:
+                    content_type = "📁 مجلد ملفات"
 
-        for elem in elements:
-            href = elem.get_attribute("href")
-            text = elem.text
-            
-            if href:
-                if any(ext in href for ext in [".pdf", "resource", "url", "video", "youtube"]):
-                    if "forcedownload=1" in href or "mod/resource" in href or "mod/url" in href:
-                        links_found.append({
-                            "name": text if text else "ملف/رابط غير مسمى",
-                            "url": href
-                        })
+                if href and "course/view.php" not in href: # تجنب روابط الصفحة نفسها
+                    links_found.append({
+                        "name": text if text else "محتوى غير مسمى",
+                        "url": href,
+                        "type": content_type
+                    })
+            except:
+                continue
+        
+        # 2. إذا ما لقيناش بالطريقة الأولى (احتياطي)
+        if not links_found:
+            elements = local_driver.find_elements(By.TAG_NAME, "a")
+            for elem in elements:
+                href = elem.get_attribute("href")
+                if href and any(ext in href.lower() for ext in ["mod/resource", "mod/url", "mod/folder", "forcedownload"]):
+                    links_found.append({
+                        "name": elem.text if elem.text else "رابط خارجي",
+                        "url": href,
+                        "type": "🔍 مورد دراسي"
+                    })
         
         return links_found
     except Exception as e:
@@ -1144,6 +1169,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache (Developer Only)", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش بنجاح!")
+
 
 
 
