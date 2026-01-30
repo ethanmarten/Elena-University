@@ -229,6 +229,49 @@ def send_otp(target_email, code):
         return True
     except: return False
 
+def get_youtube_summary(video_url):
+    try:
+        # استخراج الـ ID بأكثر من طريقة لضمان العمل
+        video_id = None
+        if "v=" in video_url:
+            video_id = video_url.split("v=")[-1].split("&")[0]
+        elif "youtu.be/" in video_url:
+            video_id = video_url.split("youtu.be/")[-1].split("?")[0]
+        
+        if not video_id:
+            return "❌ عذراً، لم أستطع التعرف على رابط الفيديو بشكل صحيح."
+
+        # سحب النص التلقائي
+        try:
+            # بنحاول نجيب العربي أولاً، إذا ما في بنجيب الإنجليزي
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            try:
+                transcript = transcript_list.find_transcript(['ar'])
+            except:
+                transcript = transcript_list.find_transcript(['en'])
+            
+            data = transcript.fetch()
+            full_text = " ".join([item['text'] for item in data])
+        except Exception as e:
+            return "❌ هذا الفيديو لا يحتوي على نص تلقائي (Transcripts) مفعل، لا أستطيع قراءته."
+
+        # الإرسال لـ Groq للتخليص
+        prompt = f"""
+        أنت مهندس ذكاء اصطناعي مساعد لزميلك الطالب إيهاب. 
+        قم بتلخيص هذه المحاضرة بدقة واحترافية. 
+        استخدم النقاط، واذكر أهم المفاهيم العلمية الواردة.
+        النص: {full_text[:8000]} 
+        """
+        # (استخدمت 8000 حرف كحد أقصى عشان ما يتجاوز الـ Context limit)
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"❌ خطأ تقني: {str(e)}"
+
 def run_selenium_task(username, password, task_type="timeline", target_url=None):
     options = Options()
     options.add_argument('--headless')
@@ -1104,6 +1147,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache (Developer Only)", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش بنجاح!")
+
 
 
 
