@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 from streamlit_cookies_manager import EncryptedCookieManager
 from PyPDF2 import PdfReader
+from youtube_transcript_api import YouTubeTranscriptApi
 import time
 import pytz
 
@@ -698,50 +699,67 @@ with tabs[1]:
         st.write(f"### 📄 الملفات والروابط المكتشفة:")
         
         for i, link in enumerate(st.session_state.current_course_links):
+            # فحص نوع الرابط
+            is_youtube = "youtube.com" in link['url'] or "youtu.be" in link['url']
+            icon = "📺" if is_youtube else "📄"
+            
             with st.container():
                 col1, col2, col3 = st.columns([3, 1, 1])
                 with col1:
-                    st.markdown(f"**{link['name']}**")
+                    st.markdown(f"{icon} **{link['name']}**")
                 with col2:
                     st.link_button("📂 فتح", link['url'], use_container_width=True)
                 with col3:
                     summarized = st.session_state.get("summarized_items", [])
                     is_done = link['url'] in summarized
-                    btn_label = "✅ ملخص" if is_done else "🪄 تلخيص"
+                    btn_label = "✅ تم" if is_done else ("🧠 تلخيص" if is_youtube else "🪄 قراءة")
                     
                     if st.button(btn_label, key=f"sum_{i}", use_container_width=True):
                         uid = st.session_state.get("u_id")
                         upass = st.session_state.get("u_pass")
                         
-                        with st.spinner(f"إيلينا تفتح ملف {link['name']} وتقرأه..."):
-                            # طلب المهمة الجديدة من السيلينيوم لقراءة الـ PDF
-                            res = run_selenium_task(uid, upass, "scrape_pdf", link['url'])
-                            
-                            if res and "pdf_text" in res:
-                                # تخزين النص في ذاكرة الـ PDF الخاصة بإيلينا
-                                if "pdf_memories" not in st.session_state:
-                                    st.session_state.pdf_memories = {}
+                        if is_youtube:
+                            # --- مسار اليوتيوب ---
+                            with st.spinner(f"إيلينا تشاهد فيديو {link['name']} وتلخصه..."):
+                                # استدعاء فنكشن اليوتيوب (تأكد إنك عرفتها فوق في الكود)
+                                summary = get_youtube_summary(link['url']) 
                                 
-                                st.session_state.pdf_memories[link['name']] = res["pdf_text"]
+                                if "messages" not in st.session_state:
+                                    st.session_state.messages = []
                                 
-                                # تذكير للرابط المكتمل
+                                st.session_state.messages.append({
+                                    "role": "assistant",
+                                    "content": f"تلخيص فيديو المحاضرة ({link['name']}):\n\n{summary}"
+                                })
+                                
                                 if "summarized_items" not in st.session_state:
                                     st.session_state.summarized_items = []
                                 st.session_state.summarized_items.append(link['url'])
-                                
-                                # تنبيه في الشات
-                                if "messages" not in st.session_state:
-                                    st.session_state.messages = []
-                                    
-                                st.session_state.messages.append({
-                                    "role": "assistant", 
-                                    "content": f"لقد قرأت محتوى ملف {link['name']} بالكامل يا إيثان! صار عندي علم بكل التفاصيل العلمية اللي جواه. اسألني عنه في أي وقت."
-                                })
-
-                                st.success(f"✅ تم سحب محتوى الملف بنجاح!")
+                                st.success("✅ تم تلخيص الفيديو!")
                                 st.rerun()
-                            else:
-                                st.error("❌ تعذر سحب محتوى الملف. قد لا يكون ملف PDF نصي.")
+                        else:
+                            # --- مسار الـ PDF (كودك الأصلي) ---
+                            with st.spinner(f"إيلينا تفتح ملف {link['name']} وتقرأه..."):
+                                res = run_selenium_task(uid, upass, "scrape_pdf", link['url'])
+                                if res and "pdf_text" in res:
+                                    if "pdf_memories" not in st.session_state:
+                                        st.session_state.pdf_memories = {}
+                                    st.session_state.pdf_memories[link['name']] = res["pdf_text"]
+                                    
+                                    if "summarized_items" not in st.session_state:
+                                        st.session_state.summarized_items = []
+                                    st.session_state.summarized_items.append(link['url'])
+                                    
+                                    if "messages" not in st.session_state:
+                                        st.session_state.messages = []
+                                    st.session_state.messages.append({
+                                        "role": "assistant",
+                                        "content": f"لقد قرأت ملف {link['name']} بنجاح! اسألني عن أي شيء جواه."
+                                    })
+                                    st.success(f"✅ تم سحب محتوى الملف!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ تعذر سحب الملف. قد يكون صورة أو يتطلب صلاحيات إضافية.")
                                                 
 with tabs[2]:
     st.subheader("📊 تقرير الأداء الشامل (كويزات وامتحانات)")
@@ -1086,6 +1104,7 @@ with st.sidebar:
         if st.button("🧹 Clear Cache (Developer Only)", use_container_width=True):
             st.cache_data.clear()
             st.success("تم مسح الكاش بنجاح!")
+
 
 
 
