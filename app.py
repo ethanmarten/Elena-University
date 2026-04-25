@@ -135,17 +135,17 @@ def send_otp(target_email, code):
         msg['From'] = EMAIL_ADDRESS
         msg['To'] = target_email
         
+        # التعديل السحري اللي زبط معك في الاختبار (البورت 587)
         with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as smtp:
             smtp.ehlo()
             smtp.starttls()
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
+            
         return True
-    except smtplib.SMTPException as e:
-        st.error(f"خطأ في إرسال البريد: {e}")
-        return False
+        
     except Exception as e:
-        st.error(f"خطأ غير متوقع: {e}")
+        st.error(f"حدث خطأ أثناء الإرسال: {e}")
         return False
 
 def get_youtube_summary(video_url):
