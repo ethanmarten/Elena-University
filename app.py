@@ -278,14 +278,16 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # Database helpers (single definition)
 def load_db():
-    """Load user database from JSON file."""
-    if not os.path.exists(DB_FILE):
-        return {}
+    if not os.path.exists("users_db.json"):
+        with open("users_db.json", "w") as f:
+            json.dump({"users": {}}, f)
+        return {"users": {}}
+    
     try:
-        with open(DB_FILE, "r", encoding="utf-8") as f:
+        with open("users_db.json", "r") as f:
             return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return {}
+    except:
+        return {"users": {}}
 
 def save_db(data):
     """Save user database to JSON file."""
