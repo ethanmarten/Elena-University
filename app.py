@@ -154,6 +154,27 @@ def get_course_content(course_url):
     except Exception as e:
         st.error(f"خطأ في جلب المحتوى: {e}")
         return []
+
+# Database helpers (single definition)
+def load_db():
+    if not os.path.exists("users_db.json"):
+        with open("users_db.json", "w") as f:
+            json.dump({"users": {}}, f)
+        return {"users": {}}
+    
+    try:
+        with open("users_db.json", "r") as f:
+            return json.load(f)
+    except:
+        return {"users": {}}
+
+def save_db(data):
+    """Save user database to JSON file."""
+    try:
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except IOError as e:
+        st.error(f"فشل حفظ البيانات: {e}")
         
 def summarize_content(text_to_analyze, content_type="ملف"):
     """Summarize content using Groq AI with proper error handling."""
@@ -275,27 +296,6 @@ DB_FILE = "users_db.json"
 MAX_FREE_SYNCS = 10
 PDF_TEXT_LIMIT = 8000
 GROQ_MODEL = "llama-3.3-70b-versatile"
-
-# Database helpers (single definition)
-def load_db():
-    if not os.path.exists("users_db.json"):
-        with open("users_db.json", "w") as f:
-            json.dump({"users": {}}, f)
-        return {"users": {}}
-    
-    try:
-        with open("users_db.json", "r") as f:
-            return json.load(f)
-    except:
-        return {"users": {}}
-
-def save_db(data):
-    """Save user database to JSON file."""
-    try:
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-    except IOError as e:
-        st.error(f"فشل حفظ البيانات: {e}")
 
 def send_otp(target_email, code):
     """Send OTP via email with proper validation and error handling."""
