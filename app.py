@@ -193,35 +193,22 @@ st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
 # --- 2. ستايل الـ CSS المطور ---
 st.markdown("""
     <style>
-    /* خلفية التطبيق المتدرجة */
-    .stApp { 
-        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); 
-        color: white; 
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    html, body, [class*="css"]  {
+        font-family: 'Cairo', sans-serif;
+        text-align: right;
+        direction: rtl;
     }
-    /* ستايل السايدبار */
-    [data-testid="stSidebar"] { 
-        background-color: rgba(15, 12, 41, 0.8); 
+    .stButton>button {
+        border-radius: 10px;
+        transition: 0.3s;
     }
-    /* صندوق تسجيل الدخول */
-    .login-box {
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 40px;
-        border-radius: 20px;
-        border: 1px solid rgba(255, 215, 0, 0.3);
-        text-align: center;
-    }
-    /* بادج البريميوم المطور */
-    .prime-badge { 
-        background: linear-gradient(45deg, #f39c12, #f1c40f); 
-        color: black; 
-        padding: 4px 12px; 
-        border-radius: 12px; 
-        font-weight: bold; 
-        font-size: 18px;
-        box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+    .stButton>button:hover {
+        border-color: #ff4b4b;
+        color: #ff4b4b;
     }
     </style>
-    """, unsafe_allow_html=True)
+    """, unsafe_layout=True)
 
 # Database helpers defined above - removed duplicate
 # --- 3. التعرف التلقائي (هاد اللي كان بيعمل NameError) ---
@@ -1562,7 +1549,13 @@ with st.sidebar:
 
     # 4. كود المطور (إيثان)
     if st.session_state.get("user_role") == "developer":
-        st.divider()
-        if st.button("🧹 Clear Cache (Developer Only)", use_container_width=True):
-            st.cache_data.clear()
-            st.success("تم مسح الكاش بنجاح!")
+    with st.expander("🛠️ لوحة تحكم المطور"):
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🧹 مسح الكاش"):
+                st.cache_data.clear()
+        with col2:
+            # زر لتحميل قاعدة البيانات للمراجعة
+            if os.path.exists("users_db.json"):
+                with open("users_db.json", "rb") as f:
+                    st.download_button("📂 تحميل قاعدة البيانات", f, file_name="users_db.json")
