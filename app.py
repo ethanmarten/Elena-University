@@ -23,6 +23,39 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import time
 import pytz
 
+st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
+
+# --- 2. ستايل الـ CSS المطور ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    html, body, [class*="css"]  {
+        font-family: 'Cairo', sans-serif;
+        text-align: right;
+        direction: rtl;
+    }
+    .stButton>button {
+        border-radius: 10px;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        border-color: #ff4b4b;
+        color: #ff4b4b;
+    }
+    </style>
+    """, unsafe_layout=True)
+
+# Database helpers defined above - removed duplicate
+# --- 3. التعرف التلقائي (هاد اللي كان بيعمل NameError) ---
+if st.query_params.get("logout") == "true":
+    st.session_state["is_logged_in"] = False
+    if "username" in cookies:
+        del cookies["username"]
+        cookies.save()
+    st.query_params.clear() # تنظيف الرابط
+    st.rerun() # إعادة تشغيل نظيفة
+
+
 LOCAL_MODE = os.environ.get("ELENA_LOCAL", "") == "1" or os.name == "nt"
 
 def get_chrome_binary_path():
@@ -208,39 +241,6 @@ def get_local_time():
     # بنجيب الوقت الحالي بناءً على المنطقة
     return datetime.now(local_tz)
 # --- 1. إعدادات الصفحة والتصميم ---
-# --- 1. إعداد الصفحة والتصميم (أول شيء ��ي الكود) ---
-st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
-
-# --- 2. ستايل الـ CSS المطور ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"]  {
-        font-family: 'Cairo', sans-serif;
-        text-align: right;
-        direction: rtl;
-    }
-    .stButton>button {
-        border-radius: 10px;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        border-color: #ff4b4b;
-        color: #ff4b4b;
-    }
-    </style>
-    """, unsafe_layout=True)
-
-# Database helpers defined above - removed duplicate
-# --- 3. التعرف التلقائي (هاد اللي كان بيعمل NameError) ---
-if st.query_params.get("logout") == "true":
-    st.session_state["is_logged_in"] = False
-    if "username" in cookies:
-        del cookies["username"]
-        cookies.save()
-    st.query_params.clear() # تنظيف الرابط
-    st.rerun() # إعادة تشغيل نظيفة
-
 # 2. الكود اللي إنت بعته (فحص الدخول التلقائي)
 if "username" in cookies and cookies["username"] != "" and not st.session_state.get("is_logged_in"):
     saved_user = cookies["username"]
