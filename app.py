@@ -25,8 +25,8 @@ import pytz
 
 # --- 1. الثوابت والإعدادات الأساسية ---
 LOCAL_MODE = os.environ.get("ELENA_LOCAL", "") == "1" or os.name == "nt"
-EMAIL_ADDRESS = "ehabalhayekm@gmail.com" 
-EMAIL_PASSWORD = "okbb sogv paoz pcf" 
+EMAIL_ADDRESS = "EMAIL_ADDRESS" 
+EMAIL_PASSWORD = "EMAIL_PASSWORD" 
 DB_FILE = "users_db.json"
 MAX_FREE_SYNCS = 10
 PDF_TEXT_LIMIT = 8000
