@@ -135,7 +135,9 @@ def send_otp(target_email, code):
         msg['From'] = EMAIL_ADDRESS
         msg['To'] = target_email
         
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as smtp:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
         return True
