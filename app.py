@@ -23,40 +23,34 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import time
 import pytz
 
-st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
-
-# --- 2. ستايل الـ CSS المطور ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
-    html, body, [class*="css"]  {
-        font-family: 'Cairo', sans-serif;
-        text-align: right;
-        direction: rtl;
-    }
-    .stButton>button {
-        border-radius: 10px;
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        border-color: #ff4b4b;
-        color: #ff4b4b;
-    }
-    </style>
-    """, unsafe_layout=True)
-
-# Database helpers defined above - removed duplicate
-# --- 3. التعرف التلقائي (هاد اللي كان بيعمل NameError) ---
-if st.query_params.get("logout") == "true":
-    st.session_state["is_logged_in"] = False
-    if "username" in cookies:
-        del cookies["username"]
-        cookies.save()
-    st.query_params.clear() # تنظيف الرابط
-    st.rerun() # إعادة تشغيل نظيفة
-
-
 LOCAL_MODE = os.environ.get("ELENA_LOCAL", "") == "1" or os.name == "nt"
+
+# Configuration Constants
+EMAIL_ADDRESS = "ehabalhayekm@gmail.com" 
+EMAIL_PASSWORD = "hvvh duch onfd xxdv" 
+DB_FILE = "users_db.json"
+MAX_FREE_SYNCS = 10
+PDF_TEXT_LIMIT = 8000
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+# Database helpers (single definition)
+def load_db():
+    """Load user database from JSON file."""
+    if not os.path.exists(DB_FILE):
+        return {}
+    try:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+def save_db(data):
+    """Save user database to JSON file."""
+    try:
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except IOError as e:
+        st.error(f"فشل حفظ البيانات: {e}")
 
 def get_chrome_binary_path():
     env_path = os.environ.get("CHROME_BINARY")
@@ -187,27 +181,6 @@ def get_course_content(course_url):
     except Exception as e:
         st.error(f"خطأ في جلب المحتوى: {e}")
         return []
-
-# Database helpers (single definition)
-def load_db():
-    if not os.path.exists("users_db.json"):
-        with open("users_db.json", "w") as f:
-            json.dump({"users": {}}, f)
-        return {"users": {}}
-    
-    try:
-        with open("users_db.json", "r") as f:
-            return json.load(f)
-    except:
-        return {"users": {}}
-
-def save_db(data):
-    """Save user database to JSON file."""
-    try:
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-    except IOError as e:
-        st.error(f"فشل حفظ البيانات: {e}")
         
 def summarize_content(text_to_analyze, content_type="ملف"):
     """Summarize content using Groq AI with proper error handling."""
@@ -241,6 +214,52 @@ def get_local_time():
     # بنجيب الوقت الحالي بناءً على المنطقة
     return datetime.now(local_tz)
 # --- 1. إعدادات الصفحة والتصميم ---
+# --- 1. إعداد الصفحة والتصميم (أول شيء ��ي الكود) ---
+st.set_page_config(page_title="Elena AI", page_icon="👑", layout="wide")
+
+# --- 2. ستايل الـ CSS المطور ---
+st.markdown("""
+    <style>
+    /* خلفية التطبيق المتدرجة */
+    .stApp { 
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); 
+        color: white; 
+    }
+    /* ستايل السايدبار */
+    [data-testid="stSidebar"] { 
+        background-color: rgba(15, 12, 41, 0.8); 
+    }
+    /* صندوق تسجيل الدخول */
+    .login-box {
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 40px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        text-align: center;
+    }
+    /* بادج البريميوم المطور */
+    .prime-badge { 
+        background: linear-gradient(45deg, #f39c12, #f1c40f); 
+        color: black; 
+        padding: 4px 12px; 
+        border-radius: 12px; 
+        font-weight: bold; 
+        font-size: 18px;
+        box-shadow: 0 4px 15px rgba(243, 156, 18, 0.3);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Database helpers defined above - removed duplicate
+# --- 3. التعرف التلقائي (هاد اللي كان بيعمل NameError) ---
+if st.query_params.get("logout") == "true":
+    st.session_state["is_logged_in"] = False
+    if "username" in cookies:
+        del cookies["username"]
+        cookies.save()
+    st.query_params.clear() # تنظيف الرابط
+    st.rerun() # إعادة تشغيل نظيفة
+
 # 2. الكود اللي إنت بعته (فحص الدخول التلقائي)
 if "username" in cookies and cookies["username"] != "" and not st.session_state.get("is_logged_in"):
     saved_user = cookies["username"]
@@ -288,14 +307,6 @@ def init_session_state():
             st.session_state[key] = value
 
 init_session_state()
-
-# Configuration Constants
-EMAIL_ADDRESS = "ehabalhayekm@gmail.com" 
-EMAIL_PASSWORD = "hvvh duch onfd xxdv" 
-DB_FILE = "users_db.json"
-MAX_FREE_SYNCS = 10
-PDF_TEXT_LIMIT = 8000
-GROQ_MODEL = "llama-3.3-70b-versatile"
 
 def send_otp(target_email, code):
     """Send OTP via email with proper validation and error handling."""
@@ -1551,13 +1562,7 @@ with st.sidebar:
 
     # 4. كود المطور (إيثان)
     if st.session_state.get("user_role") == "developer":
-    with st.expander("🛠️ لوحة تحكم المطور"):
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🧹 مسح الكاش"):
-                st.cache_data.clear()
-        with col2:
-            # زر لتحميل قاعدة البيانات للمراجعة
-            if os.path.exists("users_db.json"):
-                with open("users_db.json", "rb") as f:
-                    st.download_button("📂 تحميل قاعدة البيانات", f, file_name="users_db.json")
+        st.divider()
+        if st.button("🧹 Clear Cache (Developer Only)", use_container_width=True):
+            st.cache_data.clear()
+            st.success("تم مسح الكاش بنجاح!")
