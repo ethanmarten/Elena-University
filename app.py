@@ -114,38 +114,23 @@ def init_shared_driver():
     return st.session_state.driver
 
 def send_otp(target_email, code):
-    """Send OTP via email with proper validation and error handling."""
-    if not target_email or '@' not in target_email:
-        return False
-    
+    if not target_email or '@' not in target_email: return False
     try:
         msg = EmailMessage()
-        msg.set_content(
-            f"""مرحباً بك في منصة إيلينا AI!
-            
-            كود التحقق الخاص بك هو: {code}
-            
-            هذا الكود صالح لمرة واحدة فقط.
-            إذا لم تطلب هذا الكود، يرجى تجاهل هذه الرسالة.
-            
-            مع تحيات فريق إيلينا
-            """
-        )
+        msg.set_content(f"كود التحقق الخاص بك هو: {code}")
         msg['Subject'] = "تفعيل حساب إيلينا AI"
         msg['From'] = EMAIL_ADDRESS
         msg['To'] = target_email
         
-        # التعديل السحري اللي زبط معك في الاختبار (البورت 587)
         with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as smtp:
             smtp.ehlo()
             smtp.starttls()
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
-            
         return True
-        
     except Exception as e:
-        st.error(f"حدث خطأ أثناء الإرسال: {e}")
+        # هذا السطر رح يظهر لك الخطأ بالضبط على الشاشة
+        st.error(f"تفاصيل الخطأ من السيرفر: {str(e)}") 
         return False
 
 def get_youtube_summary(video_url):
