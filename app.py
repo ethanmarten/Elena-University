@@ -995,19 +995,28 @@ with st.sidebar:
 
     with st.expander("⚙️ الإعدادات المتقدمة"):
         if st.button("🔴 تسجيل الخروج النهائي", use_container_width=True):
-            # 1. حذف بيانات الدخول من الكوكيز
-            if "username" in cookies: 
-                del cookies["username"]
-                cookies.save()
+            # 1. تفريغ الكوكي بدلاً من حذفه (هذه الطريقة مدعومة في كل المتصفحات)
+            cookies["username"] = ""
+            cookies.save()
             
-            # 2. تفريغ كل الـ Session State
-            st.session_state.clear()
-            
-            # 3. التأكد من إرجاع حالة الدخول إلى False
+            # 2. مسح كل الجلسة (Session State)
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+                
             st.session_state["is_logged_in"] = False
             
-            # 4. تنظيف الرابط من أي إضافات (لو وجدت)
-            st.query_params.clear()
+            # 3. استخدام جافاسكريبت يعمل ريفرش للمتصفح بعد ثانية واحدة 
+            # (هذا يعطي وقت لمكتبة الكوكيز لترسل أمر المسح للمتصفح)
+            st.components.v1.html(
+                """
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1000);
+                </script>
+                """,
+                height=0
+            )
             
-            # 5. عمل ريفرش فوري من السيرفر
-            st.rerun()
+            st.warning("🔄 جاري تسجيل الخروج ومسح البيانات...")
+            st.stop() # إيقاف الكود هنا لمنع أي تداخل
