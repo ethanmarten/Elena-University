@@ -995,7 +995,19 @@ with st.sidebar:
 
     with st.expander("⚙️ الإعدادات المتقدمة"):
         if st.button("🔴 تسجيل الخروج النهائي", use_container_width=True):
-            if "username" in cookies: del cookies["username"]; cookies.save()
-            for key in list(st.session_state.keys()): del st.session_state[key]
-            st.components.v1.html("<script>window.parent.localStorage.clear(); window.parent.sessionStorage.clear(); let cp = window.parent.location.origin + window.parent.location.pathname; window.parent.location.href = cp + '?logout=true';</script>", height=0)
-            st.stop()
+            # 1. حذف بيانات الدخول من الكوكيز
+            if "username" in cookies: 
+                del cookies["username"]
+                cookies.save()
+            
+            # 2. تفريغ كل الـ Session State
+            st.session_state.clear()
+            
+            # 3. التأكد من إرجاع حالة الدخول إلى False
+            st.session_state["is_logged_in"] = False
+            
+            # 4. تنظيف الرابط من أي إضافات (لو وجدت)
+            st.query_params.clear()
+            
+            # 5. عمل ريفرش فوري من السيرفر
+            st.rerun()
