@@ -44,14 +44,9 @@ PDF_TEXT_LIMIT = 8000
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ==========================================
-# --- إعداد الكوكيز (مرة واحدة فقط لمنع التكرار) ---
+# --- إعداد الكوكيز (مرة واحدة فقط) ---
 # ==========================================
-# حيلة برمجية لمنع Streamlit من تكرار العنصر
-@st.cache_resource
-def get_cookie_manager():
-    return EncryptedCookieManager(prefix="elena", password="EM2006_secret_key")
-
-cookies = get_cookie_manager()
+cookies = EncryptedCookieManager(prefix="elena", password="EM2006_secret_key")
 
 if not cookies.ready():
     st.stop()
