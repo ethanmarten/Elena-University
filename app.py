@@ -1054,21 +1054,49 @@ with tabs[3]:
             st.markdown("---")
             st.write("### 📊 نتيجة الاختبار:")
             score = 0
+            incorrect_questions = [] # لتخزين الأسئلة الخاطئة
+            
             for i, q in enumerate(st.session_state.quiz_data):
                 if user_answers[i] == q['correct']:
                     score += 1
                     st.success(f"**السؤال {i+1}:** إجابتك صحيحة! 🎉 ({q['correct']})")
                 else:
                     st.error(f"**السؤال {i+1}:** إجابتك خاطئة! ❌ \n\n الإجابة الصحيحة هي: **{q['correct']}**")
+                    incorrect_questions.append(q['question']) # حفظ السؤال الخاطئ
                 st.info(f"💡 **التوضيح:** {q['explanation']}")
             
+            # تقييم النتيجة
             if score == len(st.session_state.quiz_data):
                 st.balloons()
                 st.success(f"🏆 نتيجتك: {score} من {len(st.session_state.quiz_data)} - أسطورة يا {friendly_name}!")
-            elif score > 0:
-                st.warning(f"👍 نتيجتك: {score} من {len(st.session_state.quiz_data)} - وحش، بس راجع المادة كمان مرة يا {friendly_name}.")
             else:
-                st.error(f"💔 نتيجتك: 0 - يبدو إنك محتاج تدرس الملف من أول وجديد يا {friendly_name}!")
+                if score > 0:
+                    st.warning(f"👍 نتيجتك: {score} من {len(st.session_state.quiz_data)} - وحش، بس راجع المادة كمان مرة يا {friendly_name}.")
+                else:
+                    st.error(f"💔 نتيجتك: 0 - يبدو إنك محتاج تدرس الملف من أول وجديد يا {friendly_name}!")
+                
+                # زر المراجعة مع إيلينا (يظهر فقط إذا كان هناك أخطاء)
+                st.markdown("---")
+                if st.button("👩‍🏫 راجع الشرح مع إيلينا", use_container_width=True):
+                    # تجهيز رسالة تلقائية لإيلينا
+                    failed_q_text = "\n".join([f"- {q}" for q in incorrect_questions])
+                    auto_prompt = f"يا إيلينا، لقد أخطأت في الاختبار في هذه المواضيع:\n{failed_q_text}\n\nهل يمكنك إعادة شرحها لي بتبسيط شديد كأنني مبتدئ مع أمثلة؟"
+                    
+                    # إضافتها للمحادثة
+                    st.session_state.messages.append({"role": "user", "content": auto_prompt})
+                    
+                    with st.spinner("إيلينا تجهز الشرح المخصص لك..."):
+                        try:
+                            # استدعاء إيلينا للرد
+                            resp = client.chat.completions.create(
+                                model="llama-3.3-70b-versatile",
+                                messages=[{"role": "system", "content": instruction}] + st.session_state.messages
+                            )
+                            answer = resp.choices[0].message.content
+                            st.session_state.messages.append({"role": "assistant", "content": answer})
+                            st.rerun() # تحديث الصفحة عشان يشوف الشرح في الشات فوق
+                        except Exception as e:
+                            st.error("مشكلة في الاتصال بإيلينا.")
                 
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
