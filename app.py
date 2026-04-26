@@ -696,21 +696,35 @@ if st.session_state.user_status == "Standard":
                 if code_in in timed_codes:
                     dur = timed_codes[code_in]
                     now = get_local_time() 
-                    if dur == "1H": expire_date = now + timedelta(hours=1)
-                    elif dur == "1D": expire_date = now + timedelta(days=1)
-                    elif dur == "1M": expire_date = now + timedelta(days=30)
-                    elif dur == "1Y": expire_date = now + timedelta(days=365)
+                    
+                    # النظام المحمي لحساب الوقت
+                    if dur == "5 Min": 
+                        expire_date = now + timedelta(minutes=5)
+                    elif dur == "10 Min": 
+                        expire_date = now + timedelta(minutes=10)
+                    elif dur == "1H": 
+                        expire_date = now + timedelta(hours=1)
+                    elif dur == "1D": 
+                        expire_date = now + timedelta(days=1)
+                    elif dur == "1M": 
+                        expire_date = now + timedelta(days=30)
+                    elif dur == "1Y": 
+                        expire_date = now + timedelta(days=365)
+                    else:
+                        # في حال كان الكود محفوظ بصيغة قديمة أو غير معروفة، نعطيه يوم افتراضي
+                        expire_date = now + timedelta(days=1)
 
                     curr_u = st.session_state.username
                     db[curr_u]["status"] = "Prime"
                     db[curr_u]["expire_at"] = expire_date.strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # حذف الكود بعد استخدامه
                     del db["timed_codes"][code_in]
                     save_db(db)
+                    
                     st.session_state.user_status = "Prime"
-                    st.success(f"✅ تم التفعيل بنجاح يا بطل! ينتهي اشتراكك في: {expire_date.strftime('%Y/%m/%d - %I:%M %p')}")
+                    st.success(f"✅ تم التفعيل بنجاح! ينتهي اشتراكك في: {expire_date.strftime('%Y/%m/%d - %I:%M %p')}")
                     st.rerun()
-                else:
-                    st.error("❌ الكود غير صحيح أو مستخدم مسبقاً.")
                     
 if st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
     remaining = 10 - user_syncs
