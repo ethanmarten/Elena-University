@@ -180,24 +180,20 @@ st.markdown("""
 if st.session_state.current_page == 'landing':
     st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
     
-    st.markdown("""
-<div class="hero-container">
-    <h1 class="hero-title">🤖 إيلينا AI</h1>
-    
-    <div class="animated-text-wrapper">
-        <span>مساعدك الذكي اللي رح يغيّر طريقة</span>
-        <div class="words-slider">
-            <span>دراستك 🚀</span>
-            <span>تلخيصك 📚</span>
-            <span>تنظيمك ⏳</span>
-            <span>تفوقك 🎯</span>
-        </div>
-        <span>للأبد.</span>
-    </div>
-    
-    <p style="font-size: 1.2rem; color: #95a5a6; margin-top: 20px;">تخطيط آلي، تلخيص فيديوهات، اختبارات ذكية، ومزامنة مع المودل بضغطة زر!</p>
+    st.markdown("""<div class="hero-container">
+<h1 class="hero-title">🤖 إيلينا AI</h1>
+<div class="animated-text-wrapper">
+<span>مساعدك الذكي اللي رح يغيّر طريقة</span>
+<span class="words-slider">
+<span>دراستك 🚀</span>
+<span>تلخيصك 📚</span>
+<span>تنظيمك ⏳</span>
+<span>تفوقك 🎯</span>
+</span>
+<span>للأبد.</span>
 </div>
-""", unsafe_allow_html=True)
+<p style="font-size: 1.2rem; color: #95a5a6; margin-top: 20px;">تخطيط آلي، تلخيص فيديوهات، اختبارات ذكية، ومزامنة مع المودل بضغطة زر!</p>
+</div>""", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -212,7 +208,7 @@ if st.session_state.current_page == 'landing':
         st.markdown("</div>", unsafe_allow_html=True)
     
     st.stop() # 🛑 بيوقف الكود هنا
-
+    
 # ==========================================
 # --- 2. عرض صفحة تسجيل الدخول (Login Page) ---
 # ==========================================
