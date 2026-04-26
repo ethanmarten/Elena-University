@@ -1336,6 +1336,9 @@ with tabs[4]:
 # --- 6. السايدبار (Sidebar) ---
 with st.sidebar:
     st.markdown("---")
+    # ==========================================
+    # --- 1. نظام اشتراك برايم (Prime) ---
+    # ==========================================
     if st.session_state.get("user_status") == "Prime":
         db = load_db() 
         current_u = st.session_state.get("username", "user")
@@ -1346,12 +1349,10 @@ with st.sidebar:
                 time_diff = dt_obj - get_local_time().replace(tzinfo=None)
                 
                 if time_diff.total_seconds() > 0:
-                    # حساب الوقت المتبقي
                     days = time_diff.days
                     hours, remainder = divmod(time_diff.seconds, 3600)
                     minutes, seconds = divmod(remainder, 60)
                     
-                    # تجميع النص بناءً على الوقت المتبقي (عشان ما يطبع 0 يوم مثلاً)
                     time_parts = []
                     if days > 0: time_parts.append(f"{days} يوم")
                     if hours > 0: time_parts.append(f"{hours} ساعة")
@@ -1360,10 +1361,7 @@ with st.sidebar:
                     
                     time_left = " و ".join(time_parts)
                     
-                    # عرض الرسالة بشكل احترافي
                     st.success(f"👑 **برايم نشطة**\n\n⏳ **ينتهي خلال:**\n {time_left}\n\n📅 **التاريخ:** {dt_obj.strftime('%Y/%m/%d - %I:%M %p')}")
-                    
-                    # إضافة كود بسيط يعمل ريفرش للصفحة كل ثانية عشان العداد ينزل لايف (اختياري)
                     time.sleep(1)
                     st.rerun()
                 else:
@@ -1375,17 +1373,71 @@ with st.sidebar:
              except: 
                 st.info(f"ينتهي: {expire_str}")
     st.markdown("---")
-    st.header("⚙️ المزامنة")
+    
+    # ==========================================
+    # --- 2. اختيار الجامعة المتعددة ---
+    # ==========================================
+    st.header("🏫 اختر جامعتك")
+    db = load_db()
+    if "universities" not in db:
+        # الجامعة الافتراضية
+        db["universities"] = {
+            "الجامعة الإسلامية بغزة": {"url": "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass", "logo": "🎓"}
+        }
+        save_db(db)
+        
+    universities = db.get("universities", {})
+    uni_list = list(universities.keys()) + ["➕ إضافة رابط جامعة جديدة"]
+    
+    selected_uni = st.selectbox("🏛️ الجامعة:", uni_list)
+    
+    if selected_uni == "➕ إضافة رابط جامعة جديدة":
+        with st.expander("🔗 إضافة مودل جامعة جديدة", expanded=True):
+            new_uni_name = st.text_input("اسم الجامعة (مثال: جامعة الأزهر):")
+            new_uni_url = st.text_input("رابط المودل (مثال: https://moodle.univ.edu):")
+            if st.button("حفظ الجامعة 💾", use_container_width=True):
+                if new_uni_name and new_uni_url:
+                    clean_url = new_uni_url.strip().rstrip('/')
+                    if not clean_url.startswith("http"):
+                        clean_url = "https://" + clean_url
+                    db["universities"][new_uni_name] = {"url": clean_url, "logo": "🌍"}
+                    save_db(db)
+                    st.success("✅ تمت الإضافة بنجاح! جاري التحديث...")
+                    time.sleep(1); st.rerun()
+                else:
+                    st.warning("⚠️ يرجى تعبئة جميع الحقول.")
+        st.session_state.moodle_url = "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass" # رابط احتياطي أثناء الإضافة
+    else:
+        st.session_state.moodle_url = universities[selected_uni]["url"]
+        st.markdown(f"**الرابط:** `{st.session_state.moodle_url}`")
+
+    st.markdown("---")
+
+    # ==========================================
+    # --- 3. تسجيل الدخول والمزامنة ---
+    # ==========================================
+    st.header("⚙️ المزامنة مع المودل")
     uid = st.text_input("الرقم الجامعي", value=st.session_state.get("u_id", ""))
     upass = st.text_input("كلمة المرور", type="password", value=st.session_state.get("u_pass", ""))
 
     if st.button("🚀 Sync Now", use_container_width=True) and uid and upass:
-        with st.spinner("جاري المزامنة..."):
-            res = run_selenium_task(uid, upass, "timeline")
+        with st.spinner(f"جاري الدخول لمودل ({selected_uni})..."):
+            # سحب رابط الجامعة المحددة وتمريره للسكربت
+            moodle_link = st.session_state.get("moodle_url", "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass")
+            res = run_selenium_task(uid, upass, "timeline", base_url=moodle_link)
+            
             if res and "courses" in res:
-                st.session_state.update({"u_id": uid, "u_pass": upass, "my_real_courses": res['courses'], "user_schedule": res.get('timeline_list', []), "student_name": res.get('student_name', 'مستخدم'), "is_synced": True})
+                st.session_state.update({
+                    "u_id": uid, 
+                    "u_pass": upass, 
+                    "my_real_courses": res['courses'], 
+                    "user_schedule": res.get('timeline_list', []), 
+                    "student_name": res.get('student_name', 'مستخدم'), 
+                    "is_synced": True
+                })
                 st.success("✅ تم الربط بنجاح!"); time.sleep(1); st.rerun()
-            else: st.error("❌ فشلت المزامنة.")
+            else: 
+                st.error("❌ فشلت المزامنة. تأكد من البيانات أو توافق رابط الجامعة.")
 
     with st.expander("⚙️ الإعدادات المتقدمة"):
         if st.button("🔴 تسجيل الخروج النهائي", use_container_width=True):
