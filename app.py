@@ -69,6 +69,38 @@ def save_db(db_data):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(db_data, f, ensure_ascii=False, indent=4)
 
+def send_otp(target_email, code):
+    if not target_email or '@' not in target_email: return False
+    
+    # سحب البيانات مباشرة من إعدادات السيرفر الآمنة
+    try:
+        EMAIL_ADDRESS = st.secrets["GMAIL_USER"]
+        EMAIL_PASSWORD = st.secrets["GMAIL_PASS"]
+    except Exception:
+        st.error("❌ السيرفر لا يستطيع العثور على الباسوورد في الـ Secrets!")
+        return False
+
+    try:
+        msg = EmailMessage()
+        msg.set_content(f"كود التحقق الخاص بك هو: {code}")
+        msg['Subject'] = "تفعيل حساب إيلينا AI"
+        msg['From'] = EMAIL_ADDRESS
+        msg['To'] = target_email
+        
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        return True
+        
+    except Exception as e:
+        # كود لكشف ما يراه السيرفر فعلياً (للتأكد)
+        st.error(f"تفاصيل الخطأ: {str(e)}")
+        st.info(f"🔍 السيرفر يحاول الدخول بإيميل: {EMAIL_ADDRESS}")
+        st.info(f"🔍 طول الباسوورد الذي يراه السيرفر: {len(EMAIL_PASSWORD)} حرف (يجب أن يكون 16)")
+        return False
+
 # ==========================================
 # --- 2. نظام الصفحات (Routing) والـ CSS ---
 # ==========================================
@@ -344,39 +376,7 @@ def init_shared_driver():
         st.session_state.driver = None
 
     return st.session_state.driver
-
-def send_otp(target_email, code):
-    if not target_email or '@' not in target_email: return False
     
-    # سحب البيانات مباشرة من إعدادات السيرفر الآمنة
-    try:
-        EMAIL_ADDRESS = st.secrets["GMAIL_USER"]
-        EMAIL_PASSWORD = st.secrets["GMAIL_PASS"]
-    except Exception:
-        st.error("❌ السيرفر لا يستطيع العثور على الباسوورد في الـ Secrets!")
-        return False
-
-    try:
-        msg = EmailMessage()
-        msg.set_content(f"كود التحقق الخاص بك هو: {code}")
-        msg['Subject'] = "تفعيل حساب إيلينا AI"
-        msg['From'] = EMAIL_ADDRESS
-        msg['To'] = target_email
-        
-        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        return True
-        
-    except Exception as e:
-        # كود لكشف ما يراه السيرفر فعلياً (للتأكد)
-        st.error(f"تفاصيل الخطأ: {str(e)}")
-        st.info(f"🔍 السيرفر يحاول الدخول بإيميل: {EMAIL_ADDRESS}")
-        st.info(f"🔍 طول الباسوورد الذي يراه السيرفر: {len(EMAIL_PASSWORD)} حرف (يجب أن يكون 16)")
-        return False
-
 def get_youtube_summary(video_url):
     if not video_url:
         return "❌ الرجاء إدخال رابط فيديو صحيح."
