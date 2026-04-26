@@ -214,6 +214,30 @@ def get_youtube_summary(video_url):
     except Exception as e:
         return f"❌ خطأ تقني: {str(e)}"
 
+def send_elena_email(receiver_email, subject, html_body):
+    try:
+        # نسحب نفس الباسوورد اللي زبطناه في الـ Secrets
+        EMAIL_ADDRESS = st.secrets["GMAIL_USER"]
+        EMAIL_PASSWORD = st.secrets["GMAIL_PASS"]
+        
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = f"Elena AI <{EMAIL_ADDRESS}>"
+        msg['To'] = receiver_email
+        
+        # بنخبر الإيميل إنو هاد تصميم HTML مش نص عادي
+        msg.set_content("يرجى تفعيل عرض HTML لرؤية الرسالة.")
+        msg.add_alternative(html_body, subtype='html')
+        
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        return str(e)
+
 def deep_scan_course(username, password, course_url, progress_callback=None):
     if not username or not password or not course_url:
         return {"error": "بيانات غير كاملة."}
@@ -804,7 +828,7 @@ with tabs[0]:
         if isinstance(schedule_data, list) and len(schedule_data) > 0:
             st.table(schedule_data)
             
-            # الأزرار الأصلية تبعتك
+            # الأزرار الأصلية
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🧐 تحليل سريع هنا"):
@@ -831,7 +855,7 @@ with tabs[0]:
                     except Exception as e: st.error(f"حدث خطأ: {str(e)}")
             
             # ==========================================
-            # --- ميزة جدول المذاكرة التلقائي (الجديدة) ---
+            # --- ميزة جدول المذاكرة التلقائي ---
             # ==========================================
             st.markdown("---")
             st.subheader("📅 خطة المذاكرة الأسبوعية الذكية")
@@ -839,7 +863,6 @@ with tabs[0]:
             
             if st.button("🪄 يا إيلينا، وزعي لي دراستي لهذا الأسبوع", use_container_width=True):
                 with st.spinner("⏳ إيلينا تقوم بتحليل مواعيدك وتصميم جدول دراسي متوازن..."):
-                    # تجهيز المهام بشكل آمن (محمي من الأخطاء لو كان العنصر نص وليس قاموس)
                     tasks_context = "\n".join([
                         f"- المهمة: {i.get('المهمة/المحاضرة', 'مهمة')} | الموعد: {i.get('الموعد', 'غير محدد')}" 
                         if isinstance(i, dict) else f"- {str(i)}" 
@@ -865,16 +888,15 @@ with tabs[0]:
                             ]
                         )
                         st.session_state.study_plan = response.choices[0].message.content
-                        st.rerun() # تحديث لعرض الخطة
+                        st.rerun() 
                     except Exception as e:
                         st.error("❌ حدث خطأ أثناء بناء الخطة، حاولي مرة أخرى.")
             
-            # عرض الخطة إذا تم توليدها وتخزينها
             if "study_plan" in st.session_state:
                 with st.expander("✨ خطتك الأسبوعية جاهزة! (انقر للعرض أو الإخفاء)", expanded=True):
                     st.markdown(st.session_state.study_plan)
                     
-                    # زر تحميل الخطة كملف
+                    # محتوى HTML الفخم
                     html_content = f"""
                     <!DOCTYPE html>
                     <html dir="rtl" lang="ar">
@@ -898,10 +920,7 @@ with tabs[0]:
                                 <h1 style="border: none;">📅 خطة المذاكرة الأسبوعية الذكية</h1>
                                 <h3 style="border: none; color: #7f8c8d;">تم إعدادها خصيصاً للبطل: {friendly_name} 👑</h3>
                             </div>
-                            
-                            <!-- هنا يتم وضع الخطة المنظمة -->
                             {markdown.markdown(st.session_state.study_plan)}
-                            
                             <div class="footer">
                                 تم التوليد بواسطة مساعدك الذكي <b>إيلينا AI</b> 🤖<br>
                                 <i>تقدر تحفظ هاد الملف كـ PDF من خلال الضغط على (Ctrl+P) واختيار حفظ كـ PDF.</i>
@@ -911,7 +930,6 @@ with tabs[0]:
                     </html>
                     """
                     
-                    # زر التحميل الجديد بالتصميم الفخم
                     st.download_button(
                         label="📥 تحميل الخطة بتصميم فخم (Smart Doc)",
                         data=html_content,
@@ -919,6 +937,37 @@ with tabs[0]:
                         mime="text/html",
                         use_container_width=True
                     )
+                    
+                    # ==========================================
+                    # --- إضافة ميزة الإرسال للإيميل ---
+                    # ==========================================
+                    st.markdown("---")
+                    st.write("📧 **أرسل الخطة إلى إيميلك لتبقى معك دائماً:**")
+                    
+                    col_em1, col_em2 = st.columns([3, 1])
+                    with col_em1:
+                        target_email = st.text_input("أدخل إيميلك:", value="", placeholder="example@gmail.com", key="plan_email_input")
+                    
+                    with col_em2:
+                        st.write("") # مسافة لضبط محاذاة الزر
+                        if st.button("🚀 إرسال الآن", use_container_width=True):
+                            if target_email and '@' in target_email:
+                                with st.spinner("جاري إرسال الخطة الفخمة لإيميلك..."):
+                                    try:
+                                        res = send_elena_email(
+                                            target_email, 
+                                            f"📅 خطة المذاكرة الأسبوعية من إيلينا - {friendly_name}", 
+                                            html_content
+                                        )
+                                        if res is True:
+                                            st.success("✅ تم الإرسال! شيك على صندوق الوارد.")
+                                            st.balloons()
+                                        else:
+                                            st.error(f"❌ فشل الإرسال: {res}")
+                                    except Exception as e:
+                                        st.error(f"❌ حدث خطأ داخلي: {e}")
+                            else:
+                                st.warning("⚠️ يرجى كتابة إيميل صحيح أولاً!")
 
         else: st.info("📅 الجدول فارغ حالياً.")
     else: st.write("📅 اضغط على زر السحب لتحديث بياناتك.")
