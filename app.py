@@ -123,75 +123,120 @@ if st.session_state.current_page == 'landing':
     st.stop() # 🛑 بيوقف الكود هنا
 
 # ==========================================
-# --- 4. عرض صفحة تسجيل الدخول (Login Page) ---
+# --- 2. عرض صفحة تسجيل الدخول (Login Page) ---
 # ==========================================
 elif st.session_state.current_page == 'login':
     st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; margin-top: 40px;'>🔑 الدخول إلى إيلينا</h2>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        with st.container(border=True):
-            username_input = st.text_input("اسم المستخدم (حساب إيلينا)")
-            password_input = st.text_input("كلمة المرور", type="password")
-            
-            if st.button("دخول 🚪", use_container_width=True, type="primary"):
-                db = load_db()
-                if username_input in db and db[username_input].get("password") == password_input:
-                    st.session_state.logged_in = True
-                    st.session_state.username = username_input
-                    st.session_state.user_role = db[username_input].get("role", "student")
-                    st.session_state.user_status = db[username_input].get("status", "Standard")
-                    st.session_state.current_page = 'main_app' # حوله للتطبيق!
-                    st.rerun()
-                else:
-                    st.error("❌ بيانات الدخول غير صحيحة!")
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        st.markdown("<h2 style='text-align: center; margin-top: 40px;'>🔑 الدخول إلى إيلينا</h2>", unsafe_allow_html=True)
         
+        with st.container(border=True):
+            u = st.text_input("اسم المستخدم", key="l_u")
+            p = st.text_input("كلمة السر", type="password", key="l_p")
+            
+            db = load_db()
+            col_in, col_forgot = st.columns(2)
+            
+            if col_in.button("دخول 🚪", use_container_width=True, type="primary"):
+                # دخول المطور إيثان السري 👑
+                if u == "ethan" and p == "EM2006":
+                    cookies["username"] = "ethan"
+                    cookies.save()
+                    st.session_state.update({"is_logged_in": True, "user_role": "developer", "user_status": "Prime", "username": "Ethan"})
+                    st.session_state.current_page = 'main_app'
+                    st.rerun()
+                # دخول الطلاب العادي
+                elif u in db and db[u]['password'] == p:
+                    cookies["username"] = u
+                    cookies.save()
+                    st.session_state.update({"is_logged_in": True, "user_role": "user", "user_status": db[u].get('status', 'Standard'), "username": u})
+                    st.session_state.current_page = 'main_app'
+                    st.rerun()
+                else: 
+                    st.error("❌ بيانات خاطئة!")
+
+            # نظام استعادة كلمة المرور تبعك
+            if col_forgot.button("نسيت كلمة السر؟", use_container_width=True):
+                st.session_state.show_reset = True
+
+            if st.session_state.get("show_reset"):
+                st.markdown("---")
+                re_e = st.text_input("إيميلك المسجل:")
+                if st.button("إرسال كود الاستعادة"):
+                    user_found = next((user for user, info in db.items() if info.get('email') == re_e), None)
+                    if user_found:
+                        otp = random.randint(1000, 9999)
+                        if send_otp(re_e, otp):
+                            st.session_state.reset_otp, st.session_state.reset_user = otp, user_found
+                            st.success("تم إرسال الكود!")
+                        else: st.error("خطأ في الإرسال")
+                    else: st.error("الإيميل غير مسجل")
+                
+                if "reset_otp" in st.session_state:
+                    c_in = st.text_input("الكود:")
+                    n_p = st.text_input("كلمة سر جديدة:", type="password")
+                    if st.button("تأكيد التغيير"):
+                        if c_in == str(st.session_state.reset_otp):
+                            db[st.session_state.reset_user]['password'] = n_p
+                            save_db(db)
+                            st.success("تم التحديث! سجل دخولك الآن.")
+                            del st.session_state.show_reset
+                            st.rerun()
+                        else: st.error("الكود خطأ")
+
         if st.button("⬅️ رجوع للرئيسية", use_container_width=True):
             st.session_state.current_page = 'landing'
             st.rerun()
             
-    st.stop() # 🛑 بيوقف الكود هنا
+    st.stop()
 
 # ==========================================
-# --- 5. عرض صفحة إنشاء الحساب (Register) ---
+# --- 3. عرض صفحة إنشاء الحساب (Register) ---
 # ==========================================
 elif st.session_state.current_page == 'register':
     st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; margin-top: 40px;'>✨ إنشاء حساب جديد</h2>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        with st.container(border=True):
-            new_user = st.text_input("اسم المستخدم الجديد")
-            new_email = st.text_input("البريد الإلكتروني (اختياري)")
-            new_pass = st.text_input("كلمة المرور", type="password")
-            
-            if st.button("إنشاء حساب ✅", use_container_width=True, type="primary"):
-                if new_user and new_pass:
-                    db = load_db()
-                    if new_user in db:
-                        st.error("❌ اسم المستخدم محجوز، اختر اسماً آخر.")
-                    else:
-                        db[new_user] = {
-                            "password": new_pass,
-                            "email": new_email,
-                            "role": "student",
-                            "status": "Standard"
-                        }
-                        save_db(db)
-                        st.success("🎉 تم إنشاء الحساب بنجاح! جاري تحويلك...")
-                        # تسجيل الدخول تلقائياً بعد إنشاء الحساب
-                        st.session_state.logged_in = True
-                        st.session_state.username = new_user
-                        st.session_state.user_role = "student"
-                        st.session_state.user_status = "Standard"
-                        st.session_state.current_page = 'main_app'
-                        import time; time.sleep(1.5)
-                        st.rerun()
-                else:
-                    st.warning("⚠️ يرجى تعبئة اسم المستخدم وكلمة المرور.")
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        st.markdown("<h2 style='text-align: center; margin-top: 40px;'>✨ إنشاء حساب جديد</h2>", unsafe_allow_html=True)
         
+        with st.container(border=True):
+            db = load_db()
+            nu = st.text_input("اسم مستخدم جديد", key="s_u")
+            ne = st.text_input("Gmail", key="s_e")
+            np = st.text_input("كلمة سر جديدة", type="password", key="s_p")
+            
+            if st.button("إرسال كود التحقق 📧", type="primary", use_container_width=True):
+                if nu in db: st.error("موجود مسبقاً")
+                elif not ne.endswith("@gmail.com"): st.warning("استخدم Gmail")
+                else:
+                    otp = random.randint(1000, 9999)
+                    if send_otp(ne, otp):
+                        st.session_state.temp_otp, st.session_state.temp_data = otp, {"u": nu, "p": np, "e": ne}
+                        st.success("تفقد إيميلك")
+            
+            if "temp_otp" in st.session_state:
+                otp_in = st.text_input("أدخل كود التحقق:")
+                if st.button("تأكيد الحساب ✅"):
+                    if otp_in == str(st.session_state.temp_otp):
+                        d = st.session_state.temp_data
+                        db[d['u']] = {"password": d['p'], "email": d['e'], "status": "Standard", "sync_count": 0}
+                        save_db(db)
+                        st.success("تم! جاري تحويلك...")
+                        del st.session_state.temp_otp
+                        
+                        # دخول تلقائي
+                        cookies["username"] = d['u']
+                        cookies.save()
+                        st.session_state.update({"is_logged_in": True, "user_role": "user", "user_status": "Standard", "username": d['u']})
+                        st.session_state.current_page = 'main_app'
+                        time.sleep(1.5)
+                        st.rerun()
+                    else:
+                        st.error("الكود غير صحيح")
+
         if st.button("⬅️ رجوع للرئيسية", use_container_width=True):
             st.session_state.current_page = 'landing'
             st.rerun()
@@ -788,95 +833,7 @@ if "username" in cookies and cookies["username"] != "" and not st.session_state.
             "u_id": db[saved_user].get("u_id", ""), 
             "u_pass": db[saved_user].get("u_pass", "")
         })
-
-if not st.session_state.get("is_logged_in"):
-    _, center_col, _ = st.columns([1, 2, 1])
-    with center_col:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.markdown("<h1 style='color: #FFD700;'>👑 Elena AI Portal</h1>", unsafe_allow_html=True)
         
-        tab_login, tab_signup = st.tabs(["🔑 تسجيل دخول", "📝 تسجيل جديد"])
-        db = load_db()
-
-        with tab_login:
-            u = st.text_input("اسم المستخدم", key="l_u")
-            p = st.text_input("كلمة السر", type="password", key="l_p")
-            uid_input = st.text_input("الرقم الجامعي (اختياري)", key="l_uid")
-            upass_input = st.text_input("باسورد الجامعة (اختياري)", type="password", key="l_upass")
-
-            col_in, col_forgot = st.columns(2)
-            if col_in.button("دخول للنظام", use_container_width=True):
-                if u == "ethan" and p == "EM2006":
-                    cookies["username"] = "ethan"
-                    cookies.save()
-                    st.session_state.update({"is_logged_in": True, "user_role": "developer", "user_status": "Prime", "username": "Ethan", "u_id": uid_input, "u_pass": upass_input})
-                    st.rerun()
-                elif u in db and db[u]['password'] == p:
-                    cookies["username"] = u
-                    cookies.save()
-                    st.session_state.update({"is_logged_in": True, "user_role": "user", "user_status": db[u]['status'], "username": u, "u_id": uid_input, "u_pass": upass_input})
-                    st.rerun()
-                else: 
-                    st.error("بيانات خاطئة!")
-
-            if col_forgot.button("نسيت كلمة السر؟", use_container_width=True):
-                st.session_state.show_reset = True
-
-            if st.session_state.get("show_reset"):
-                st.markdown("---")
-                re_e = st.text_input("إيميلك المسجل:")
-                if st.button("إرسال كود الاستعادة"):
-                    user_found = next((user for user, info in db.items() if info.get('email') == re_e), None)
-                    if user_found:
-                        otp = random.randint(1000, 9999)
-                        if send_otp(re_e, otp):
-                            st.session_state.reset_otp, st.session_state.reset_user = otp, user_found
-                            st.success("تم إرسال الكود!")
-                        else: st.error("خطأ في الإرسال")
-                    else: st.error("الإيميل غير مسجل")
-                
-                if "reset_otp" in st.session_state:
-                    c_in = st.text_input("الكود:")
-                    n_p = st.text_input("كلمة سر جديدة:", type="password")
-                    if st.button("تأكيد التغيير"):
-                        if c_in == str(st.session_state.reset_otp):
-                            db[st.session_state.reset_user]['password'] = n_p
-                            save_db(db)
-                            st.success("تم التحديث!")
-                            del st.session_state.show_reset
-                            st.rerun()
-                        else: st.error("الكود خطأ")
-
-        with tab_signup:
-            nu = st.text_input("اسم مستخدم جديد", key="s_u")
-            ne = st.text_input("Gmail", key="s_e")
-            np = st.text_input("كلمة سر جديدة", type="password", key="s_p")
-            
-            if st.button("إرسال كود التحقق 📧"):
-                if nu in db: st.error("موجود مسبقاً")
-                elif not ne.endswith("@gmail.com"): st.warning("استخدم Gmail")
-                else:
-                    otp = random.randint(1000, 9999)
-                    if send_otp(ne, otp):
-                        st.session_state.temp_otp, st.session_state.temp_data = otp, {"u": nu, "p": np, "e": ne}
-                        st.success("تفقد إيميلك")
-            
-            if "temp_otp" in st.session_state:
-                otp_in = st.text_input("أدخل كود التحقق:")
-                if st.button("تأكيد الحساب"):
-                    if otp_in == str(st.session_state.temp_otp):
-                        d = st.session_state.temp_data
-                        db[d['u']] = {"password": d['p'], "email": d['e'], "status": "Standard", "sync_count": 0}
-                        save_db(db)
-                        st.success("تم! سجل دخولك الآن.")
-                        del st.session_state.temp_otp
-                        st.rerun()
-                    else:
-                        st.error("الكود غير صحيح")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()
-
 # --- 5. الواجهة الرئيسية (التطبيق بعد الدخول) ---
 db = load_db()
 current_u = st.session_state.get("username", "user")
