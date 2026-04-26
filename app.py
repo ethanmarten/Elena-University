@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import smtplib
 import random
@@ -996,6 +997,78 @@ with tabs[3]:
     if st.sidebar.button("🗑️ مسح محادثة إيلينا", key="clear_chat"):
         st.session_state.messages = []
         st.rerun()
+
+    # ==========================================
+    # --- إضافة ميزة صانع الاختبارات الذكي ---
+    # ==========================================
+    st.markdown("---")
+    st.subheader("📝 اختبر نفسك (Quiz Generator)")
+    
+    # دمج المحتوى للتحليل
+    study_context = deep_context + "\n" + pdf_context
+    
+    if st.button("🧠 ولّدي لي اختبار من هذه الملفات", use_container_width=True):
+        if not study_context.strip():
+            st.warning(f"⚠️ يا {friendly_name}، يرجى إضافة ملفات لقاعدة المعرفة أو المزامنة مع المودل أولاً!")
+        else:
+            with st.spinner("⏳ إيلينا تقوم بتحليل المحتوى وتجهيز أسئلة ذكية..."):
+                quiz_prompt = f"""
+                بناءً على هذا المحتوى، قم بإنشاء 3 أسئلة خيارات متعددة (MCQ).
+                يجب أن يكون الرد بصيغة JSON فقط بهذا الشكل بالضبط بدون أي نصوص إضافية:
+                [
+                    {{"question": "السؤال هنا؟", "options": ["خيار1", "خيار2", "خيار3", "خيار4"], "correct": "خيار2", "explanation": "شرح مبسط للإجابة"}}
+                ]
+                المحتوى:
+                {study_context[:6000]}
+                """
+                try:
+                    response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": quiz_prompt}],
+                        temperature=0.3
+                    )
+                    quiz_json = response.choices[0].message.content.strip()
+                    
+                    if quiz_json.startswith("```json"): quiz_json = quiz_json[7:-3].strip()
+                    elif quiz_json.startswith("```"): quiz_json = quiz_json[3:-3].strip()
+                        
+                    st.session_state.quiz_data = json.loads(quiz_json)
+                    st.session_state.quiz_submitted = False
+                    st.rerun() 
+                except Exception as e:
+                    st.error("❌ حدث خطأ أثناء توليد الاختبار، يرجى المحاولة مرة أخرى.")
+
+    if "quiz_data" in st.session_state:
+        st.write("### 🎯 أجب عن الأسئلة التالية:")
+        user_answers = {}
+        
+        for i, q in enumerate(st.session_state.quiz_data):
+            st.markdown(f"**{i+1}. {q['question']}**")
+            user_answers[i] = st.radio("اختر الإجابة:", q['options'], key=f"quiz_q_{i}", index=None)
+            st.write("")
+            
+        if st.button("✅ تقديم الإجابات ورؤية النتيجة", use_container_width=True):
+            st.session_state.quiz_submitted = True
+            
+        if st.session_state.get("quiz_submitted"):
+            st.markdown("---")
+            st.write("### 📊 نتيجة الاختبار:")
+            score = 0
+            for i, q in enumerate(st.session_state.quiz_data):
+                if user_answers[i] == q['correct']:
+                    score += 1
+                    st.success(f"**السؤال {i+1}:** إجابتك صحيحة! 🎉 ({q['correct']})")
+                else:
+                    st.error(f"**السؤال {i+1}:** إجابتك خاطئة! ❌ \n\n الإجابة الصحيحة هي: **{q['correct']}**")
+                st.info(f"💡 **التوضيح:** {q['explanation']}")
+            
+            if score == len(st.session_state.quiz_data):
+                st.balloons()
+                st.success(f"🏆 نتيجتك: {score} من {len(st.session_state.quiz_data)} - أسطورة يا {friendly_name}!")
+            elif score > 0:
+                st.warning(f"👍 نتيجتك: {score} من {len(st.session_state.quiz_data)} - وحش، بس راجع المادة كمان مرة يا {friendly_name}.")
+            else:
+                st.error(f"💔 نتيجتك: 0 - يبدو إنك محتاج تدرس الملف من أول وجديد يا {friendly_name}!")
                 
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
