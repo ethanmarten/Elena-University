@@ -838,8 +838,12 @@ with tabs[0]:
             
             if st.button("🪄 يا إيلينا، وزعي لي دراستي لهذا الأسبوع", use_container_width=True):
                 with st.spinner("⏳ إيلينا تقوم بتحليل مواعيدك وتصميم جدول دراسي متوازن..."):
-                    # تجهيز المهام لإيلينا
-                    tasks_context = "\n".join([f"- المهمة: {i.get('المهمة/المحاضرة', 'مهمة')} | الموعد: {i.get('الموعد', 'غير محدد')}" for i in schedule_data])
+                    # تجهيز المهام بشكل آمن (محمي من الأخطاء لو كان العنصر نص وليس قاموس)
+                    tasks_context = "\n".join([
+                        f"- المهمة: {i.get('المهمة/المحاضرة', 'مهمة')} | الموعد: {i.get('الموعد', 'غير محدد')}" 
+                        if isinstance(i, dict) else f"- {str(i)}" 
+                        for i in schedule_data
+                    ])
                     
                     planner_prompt = f"""
                     أنتِ إيلينا، مستشارة أكاديمية خبيرة. بناءً على هذه المهام القادمة للطالب {friendly_name}:
