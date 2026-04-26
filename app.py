@@ -123,6 +123,39 @@ st.markdown("""
     .hero-title { font-size: 4rem; font-weight: 900; color: #2c3e50; margin-bottom: 10px; }
     .hero-subtitle { font-size: 1.5rem; color: #7f8c8d; margin-bottom: 40px; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* تأثير الكلمات المتحركة (Text Slider) */
+    .animated-text-wrapper {
+        font-size: 1.8rem;
+        color: #7f8c8d;
+        margin-bottom: 40px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+    }
+    .words-slider {
+        display: inline-block;
+        overflow: hidden;
+        height: 1.5em;
+        vertical-align: bottom;
+    }
+    .words-slider span {
+        display: block;
+        height: 1.5em;
+        line-height: 1.5em;
+        color: #3498db; /* لون أزرق فخم للكلمة المتغيرة */
+        font-weight: 900;
+        animation: spinWords 8s infinite cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    /* الأنميشن اللي بيقلب الكلمات */
+    @keyframes spinWords {
+        0%, 15% { transform: translateY(0); }
+        25%, 40% { transform: translateY(-1.5em); }
+        50%, 65% { transform: translateY(-3.0em); }
+        75%, 90% { transform: translateY(-4.5em); }
+        100% { transform: translateY(0); }
+    }
 </style>
 
 <button onclick="topFunction()" id="myBtn" title="اطلع لفوق">⬆️</button>
@@ -144,8 +177,24 @@ st.markdown("""
 # ==========================================
 # --- 3. عرض صفحة الهبوط (Landing Page) ---
 # ==========================================
-if st.session_state.current_page == 'landing':
-    st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
+st.markdown("""
+        <div class="hero-container">
+            <h1 class="hero-title">🤖 إيلينا AI</h1>
+            
+            <div class="animated-text-wrapper">
+                <span>مساعدك الذكي اللي رح يغيّر طريقة</span>
+                <span class="words-slider">
+                    <span>دراستك 🚀</span>
+                    <span>تلخيصك 📚</span>
+                    <span>تنظيمك ⏳</span>
+                    <span>تفوقك 🎯</span>
+                </span>
+                <span>للأبد.</span>
+            </div>
+            
+            <p style="font-size: 1.2rem; color: #95a5a6;">تخطيط آلي، تلخيص فيديوهات، اختبارات ذكية، ومزامنة مع المودل بضغطة زر!</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
         <div class="hero-container">
