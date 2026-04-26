@@ -1271,33 +1271,67 @@ with tabs[3]:
         
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
-        st.subheader("🛠️ لوحة تحكم المطور")
+        st.subheader("🛠️ لوحة قيادة إيثان (Admin Dashboard)")
         db = load_db()
-        st.write("👥 بيانات المستخدمين:"); st.json(db)
         
-        st.write("🔑 **توليد أكواد بريميوم وتجريبية**")
+        # ==========================================
+        # --- 1. الإحصائيات السريعة ---
+        # ==========================================
+        st.markdown("### 📊 إحصائيات المنصة الحية")
+        
+        total_users = 0
+        prime_users = 0
+        standard_users = 0
+        
+        # حساب الأرقام من قاعدة البيانات
+        for k, v in db.items():
+            if k != "timed_codes" and isinstance(v, dict) and "password" in v:
+                total_users += 1
+                if v.get("status") == "Prime":
+                    prime_users += 1
+                else:
+                    standard_users += 1
+        
+        active_codes = len(db.get("timed_codes", {}))
+        
+        # عرض الإحصائيات بشكل مربعات احترافية
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("👥 إجمالي الطلاب", total_users)
+        col2.metric("👑 طلاب Prime", prime_users)
+        col3.metric("🆓 طلاب Standard", standard_users)
+        col4.metric("🔑 أكواد فعالة", active_codes)
+        
+        st.markdown("---")
+        
+        # ==========================================
+        # --- 2. إدارة وتوليد الأكواد ---
+        # ==========================================
+        st.markdown("### 🔑 **توليد أكواد بريميوم وتجريبية**")
         col_c, col_t = st.columns([2, 1])
-        with col_c: new_c = st.text_input("الكود:")
-        
-        # أضفنا خيارات الدقائق التجريبية هنا
+        with col_c: new_c = st.text_input("الكود الجديد:", placeholder="مثال: ELENA-VIP-2026")
         with col_t: duration = st.selectbox("المدة:", ["5 Min", "10 Min", "1H", "1D", "1M", "1Y"])
         
-        if st.button("حفظ ✅", use_container_width=True) and new_c:
+        if st.button("حفظ الكود ✅", use_container_width=True) and new_c:
             if "timed_codes" not in db: db["timed_codes"] = {}
             db["timed_codes"][new_c] = duration
             save_db(db)
-            st.success(f"تم حفظ كود {new_c} لمدة {duration}"); st.rerun()
-
-        st.write("🚫 **إدارة الاشتراكات**")
-        prime_users = [u for u, data in db.items() if isinstance(data, dict) and data.get("status") == "Prime"]
-        if prime_users:
-            selected_user = st.selectbox("اختر مستخدم:", prime_users)
-            if st.button(f"إلغاء اشتراك {selected_user}"):
-                db[selected_user]["status"] = "Standard"
-                if "expire_at" in db[selected_user]: del db[selected_user]["expire_at"]
-                save_db(db)
-                st.error(f"تم الإلغاء لـ {selected_user}"); st.rerun()
-    else: st.error("🚫 مخصص للمطور فقط.")
+            st.success(f"🎉 تم حفظ كود {new_c} لمدة {duration}"); st.rerun()
+            
+        # عرض الأكواد التي لم تُستخدم بعد لسهولة النسخ
+        if active_codes > 0:
+            with st.expander("👀 عرض الأكواد الجاهزة (غير المستخدمة)", expanded=True):
+                for c, d in db.get("timed_codes", {}).items():
+                    st.info(f"**الكود:** `{c}` ⬅️ **المدة:** {d}")
+        else:
+            st.warning("⚠️ لا يوجد أي أكواد فعالة حالياً، قم بتوليد أكواد جديدة لطلابك.")
+            
+        st.markdown("---")
+        
+        # ==========================================
+        # --- 3. قاعدة البيانات الخام ---
+        # ==========================================
+        with st.expander("⚙️ عرض قاعدة البيانات كاملة (للمطورين فقط)"):
+            st.json(db)
 
 # --- 6. السايدبار (Sidebar) ---
 with st.sidebar:
