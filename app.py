@@ -36,6 +36,18 @@ MAX_FREE_SYNCS = 10
 PDF_TEXT_LIMIT = 8000
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
+# --- 1. الثوابت والإعدادات الأساسية ---
+LOCAL_MODE = os.environ.get("ELENA_LOCAL", "") == "1" or os.name == "nt"
+DB_FILE = "users_db.json"
+MAX_FREE_SYNCS = 10
+PDF_TEXT_LIMIT = 8000
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+# 🔴 هنا لازم تحط كود الـ Cookies 🔴
+cookies = EncryptedCookieManager(prefix="elena", password="your_super_secret_password_here")
+if not cookies.ready():
+    st.stop()
+
 # ==========================================
 # --- 1. تعريف دوال الداتا بيز الأساسية ---
 # ==========================================
