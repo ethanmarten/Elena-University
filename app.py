@@ -1123,8 +1123,9 @@ with tabs[3]:
             </script>
             """, height=0
         )
-        st.session_state.scroll_down = False # عشان ما ينزل كل مرة
-                
+        st.session_state.scroll_down = False 
+        st.markdown("<div id='chat-bottom'></div>", unsafe_allow_html=True)
+        
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
         st.subheader("🛠️ لوحة تحكم المطور")
