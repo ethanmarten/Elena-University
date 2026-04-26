@@ -938,15 +938,18 @@ with tabs[4]:
         db = load_db()
         st.write("👥 بيانات المستخدمين:"); st.json(db)
         
-        st.write("🔑 **توليد أكواد بريميوم**")
+        st.write("🔑 **توليد أكواد بريميوم وتجريبية**")
         col_c, col_t = st.columns([2, 1])
         with col_c: new_c = st.text_input("الكود:")
-        with col_t: duration = st.selectbox("المدة:", ["1H", "1D", "1M", "1Y"])
+        
+        # أضفنا خيارات الدقائق التجريبية هنا
+        with col_t: duration = st.selectbox("المدة:", ["5 Min", "10 Min", "1H", "1D", "1M", "1Y"])
+        
         if st.button("حفظ ✅", use_container_width=True) and new_c:
             if "timed_codes" not in db: db["timed_codes"] = {}
             db["timed_codes"][new_c] = duration
             save_db(db)
-            st.success(f"تم حفظ {new_c}"); st.rerun()
+            st.success(f"تم حفظ كود {new_c} لمدة {duration}"); st.rerun()
 
         st.write("🚫 **إدارة الاشتراكات**")
         prime_users = [u for u, data in db.items() if isinstance(data, dict) and data.get("status") == "Prime"]
@@ -967,17 +970,39 @@ with st.sidebar:
         current_u = st.session_state.get("username", "user")
         expire_str = db.get(current_u, {}).get("expire_at")
         if expire_str:
-            try:
+             try:
                 dt_obj = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
                 time_diff = dt_obj - get_local_time().replace(tzinfo=None)
+                
                 if time_diff.total_seconds() > 0:
-                    st.success(f"👑 **برايم نشطة**\n\n📅 ينتهي: {dt_obj.strftime('%Y/%m/%d - %I:%M %p')}")
+                    # حساب الوقت المتبقي
+                    days = time_diff.days
+                    hours, remainder = divmod(time_diff.seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    
+                    # تجميع النص بناءً على الوقت المتبقي (عشان ما يطبع 0 يوم مثلاً)
+                    time_parts = []
+                    if days > 0: time_parts.append(f"{days} يوم")
+                    if hours > 0: time_parts.append(f"{hours} ساعة")
+                    if minutes > 0: time_parts.append(f"{minutes} دقيقة")
+                    time_parts.append(f"{seconds} ثانية")
+                    
+                    time_left = " و ".join(time_parts)
+                    
+                    # عرض الرسالة بشكل احترافي
+                    st.success(f"👑 **برايم نشطة**\n\n⏳ **ينتهي خلال:**\n {time_left}\n\n📅 **التاريخ:** {dt_obj.strftime('%Y/%m/%d - %I:%M %p')}")
+                    
+                    # إضافة كود بسيط يعمل ريفرش للصفحة كل ثانية عشان العداد ينزل لايف (اختياري)
+                    time.sleep(1)
+                    st.rerun()
                 else:
                     db[current_u]["status"] = "Standard"
                     save_db(db)
                     st.session_state.user_status = "Standard"
-                    st.error("⚠️ **انتهى الاشتراك!**"); st.rerun() 
-            except: st.info(f"ينتهي: {expire_str}")
+                    st.error("⚠️ **انتهى الاشتراك!**")
+                    st.rerun() 
+            except: 
+                st.info(f"ينتهي: {expire_str}")
 
     st.markdown("---")
     st.header("⚙️ المزامنة")
