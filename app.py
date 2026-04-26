@@ -177,7 +177,13 @@ st.markdown("""
 # ==========================================
 # --- 3. عرض صفحة الهبوط (Landing Page) ---
 # ==========================================
-st.markdown("""
+# ==========================================
+# --- 3. عرض صفحة الهبوط (Landing Page) ---
+# ==========================================
+if st.session_state.current_page == 'landing':
+    st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
+    
+    st.markdown("""
         <div class="hero-container">
             <h1 class="hero-title">🤖 إيلينا AI</h1>
             
@@ -196,14 +202,6 @@ st.markdown("""
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("""
-        <div class="hero-container">
-            <h1 class="hero-title">🤖 إيلينا AI</h1>
-            <p class="hero-subtitle">مساعدك الأكاديمي الذكي اللي رح يغير طريقة دراستك للأبد.</p>
-            <p>تخطيط آلي، تلخيص، اختبارات ذكية، ومزامنة مع جامعتك بضغطة زر!</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("🚀 ابدأ مجاناً الآن (إنشاء حساب)", use_container_width=True, type="primary"):
@@ -216,7 +214,7 @@ st.markdown("""
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
     
-    st.stop() # 🛑 بيوقف الكود هنا
+    st.stop() # 🛑 بيوقف الكود هنا # 🛑 بيوقف الكود هنا
 
 # ==========================================
 # --- 2. عرض صفحة تسجيل الدخول (Login Page) ---
