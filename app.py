@@ -802,6 +802,8 @@ with tabs[0]:
         st.write("### 📋 جدول المهام القادمة:")
         if isinstance(schedule_data, list) and len(schedule_data) > 0:
             st.table(schedule_data)
+            
+            # الأزرار الأصلية تبعتك
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🧐 تحليل سريع هنا"):
@@ -826,6 +828,56 @@ with tabs[0]:
                         st.success("تم إرسال الجدول! انتقل لتبويب Ask Elena 🤖")
                         st.balloons() 
                     except Exception as e: st.error(f"حدث خطأ: {str(e)}")
+            
+            # ==========================================
+            # --- ميزة جدول المذاكرة التلقائي (الجديدة) ---
+            # ==========================================
+            st.markdown("---")
+            st.subheader("📅 خطة المذاكرة الأسبوعية الذكية")
+            st.info("💡 دعي إيلينا توزع لك هذه المهام على أيام الأسبوع لتجنب التراكم والضغط.")
+            
+            if st.button("🪄 يا إيلينا، وزعي لي دراستي لهذا الأسبوع", use_container_width=True):
+                with st.spinner("⏳ إيلينا تقوم بتحليل مواعيدك وتصميم جدول دراسي متوازن..."):
+                    # تجهيز المهام لإيلينا
+                    tasks_context = "\n".join([f"- المهمة: {i.get('المهمة/المحاضرة', 'مهمة')} | الموعد: {i.get('الموعد', 'غير محدد')}" for i in schedule_data])
+                    
+                    planner_prompt = f"""
+                    أنتِ إيلينا، مستشارة أكاديمية خبيرة. بناءً على هذه المهام القادمة للطالب {friendly_name}:
+                    {tasks_context}
+                    
+                    قومي بتصميم "جدول مذاكرة أسبوعي" عملي جداً ومقسم على أيام الأسبوع (من السبت للجمعة).
+                    - وزعي المهام بحيث لا يتراكم الضغط في يوم واحد.
+                    - اقترحي عدد ساعات الدراسة لكل مهمة يومياً.
+                    - ضعي نصائح استراحة وتقنية (Pomodoro).
+                    - اجعلي الرد بتنسيق Markdown جميل وملون باستخدام الإيموجي الجذابة.
+                    """
+                    try:
+                        response = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile", 
+                            messages=[
+                                {"role": "system", "content": f"أنتِ إيلينا، وتخاطبين الطالب {friendly_name} بأسلوب محفز."}, 
+                                {"role": "user", "content": planner_prompt}
+                            ]
+                        )
+                        st.session_state.study_plan = response.choices[0].message.content
+                        st.rerun() # تحديث لعرض الخطة
+                    except Exception as e:
+                        st.error("❌ حدث خطأ أثناء بناء الخطة، حاولي مرة أخرى.")
+            
+            # عرض الخطة إذا تم توليدها وتخزينها
+            if "study_plan" in st.session_state:
+                with st.expander("✨ خطتك الأسبوعية جاهزة! (انقر للعرض أو الإخفاء)", expanded=True):
+                    st.markdown(st.session_state.study_plan)
+                    
+                    # زر تحميل الخطة كملف
+                    st.download_button(
+                        label="📥 تحميل الخطة كملف (Markdown)",
+                        data=st.session_state.study_plan,
+                        file_name=f"study_plan_{friendly_name}.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+
         else: st.info("📅 الجدول فارغ حالياً.")
     else: st.write("📅 اضغط على زر السحب لتحديث بياناتك.")
         
