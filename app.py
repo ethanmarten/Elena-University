@@ -43,8 +43,16 @@ MAX_FREE_SYNCS = 10
 PDF_TEXT_LIMIT = 8000
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# 🔴 هنا لازم تحط كود الـ Cookies 🔴
-cookies = EncryptedCookieManager(prefix="elena", password="your_super_secret_password_here")
+# ==========================================
+# --- إعداد الكوكيز (مرة واحدة فقط لمنع التكرار) ---
+# ==========================================
+# حيلة برمجية لمنع Streamlit من تكرار العنصر
+@st.cache_resource
+def get_cookie_manager():
+    return EncryptedCookieManager(prefix="elena", password="EM2006_secret_key")
+
+cookies = get_cookie_manager()
+
 if not cookies.ready():
     st.stop()
 
@@ -802,10 +810,6 @@ if not GROQ_API_KEY:
     st.stop()
 else:
     client = Groq(api_key=GROQ_API_KEY)
-
-cookies = EncryptedCookieManager(prefix="elena/", password="EM2006_secret_key")
-if not cookies.ready():
-    st.stop()
 
 init_session_state()
 
