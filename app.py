@@ -807,7 +807,13 @@ with tabs[0]:
                         try:
                             stext = "\n".join([f"- {i.get('المهمة/المحاضرة', 'مهمة')} ({i.get('الموعد', 'ميعاد غير محدد')})" for i in schedule_data])
                             prompt = f"حللي جدولي الجامعي ورتبي أولوياتي بأسلوب مشجع:\n{stext}"
-                            response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": "أنتِ إيلينا، خبيرة تنظيم وقت."}, {"role": "user", "content": prompt}])
+                            response = client.chat.completions.create(
+                                model="llama-3.3-70b-versatile", 
+                                messages=[
+                                    {"role": "system", "content": f"أنتِ إيلينا، خبيرة تنظيم وقت ذكية. خاطبي الطالب '{friendly_name}' باسمه بأسلوب محفز."}, 
+                                    {"role": "user", "content": prompt}
+                                ]
+                           )
                             st.info(response.choices[0].message.content)
                         except: st.error("خطأ في الاتصال بالـ AI.")
             with col2:
@@ -921,7 +927,7 @@ with tabs[2]:
                         st.rerun()
                     else: st.error("❌ فشل سحب الدرجات.")
             else: st.warning("⚠️ سجل دخول أولاً من القائمة الجانبية!")
-    else: st.info("💡 يا إيثان، حدث قائمة المقررات أولاً.")
+    else: st.info(f"💡 يا {friendly_name}، حدث قائمة المقررات أولاً من التبويب الأول لتظهر هنا.")
 
     if st.session_state.get("detailed_grades_text"):
         current_course = st.session_state.get("last_grade_course", "المادة المختارة")
@@ -930,7 +936,13 @@ with tabs[2]:
         if st.button("🤖 اطلبي نصيحة إيلينا للتطوير", use_container_width=True):
             with st.spinner("إيلينا تراجع درجاتك..."):
                 try:
-                    response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": "أنتِ إيلينا، مستشارة أكاديمية ذكية جداً."}, {"role": "user", "content": f"هذه درجاتي: {st.session_state.detailed_grades_text}"}])
+                    response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile", 
+                    messages=[
+                        {"role": "system", "content": f"أنتِ إيلينا، مستشارة أكاديمية ذكية. قومي بتحليل درجات الطالب '{friendly_name}' وخاطبيه باسمه بشكل تشجيعي وعملي."}, 
+                        {"role": "user", "content": f"هذه درجاتي: {st.session_state.detailed_grades_text}"}
+                    ]
+                )
                     st.success(f"📈 **تحليل إيلينا:**")
                     st.write(response.choices[0].message.content)
                 except Exception as e: st.error(f"حدث خطأ: {e}")
@@ -956,7 +968,11 @@ with tabs[3]:
     pdf_context = ""
     for name, text in st.session_state.get("pdf_memories", {}).items(): pdf_context += f"\n--- ملف: {name} ---\n{text[:6000]}\n"
     
-    instruction = f"""أنتِ إيلينا، المحللة الأكاديمية. \nالمعرفة:\n{deep_context}\n{pdf_context}\n"""
+    instruction = f"""أنتِ إيلينا، المحللة الأكاديمية الخاصة بالطالب {friendly_name}. خاطبيه دائماً باسمه ({friendly_name}) بأسلوب ودود.
+    المعرفة:
+    {deep_context}
+    {pdf_context}
+    """
     
     chat_container = st.container()
     with chat_container:
