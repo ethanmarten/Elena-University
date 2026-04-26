@@ -378,13 +378,32 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
         time.sleep(15) 
 
         student_name = "طالب جامعي"
-        for sel in [".usertext", ".userbutton span", ".username"]:
+        
+        # 1. المحاولة الأولى: السحب من النصوص في القائمة العلوية
+        for sel in [".usertext", ".userbutton .usertext", ".usermenu .usertext", "span.usertext", ".logininfo a"]:
             try:
                 name_element = driver.find_element(By.CSS_SELECTOR, sel)
-                if name_element.text.strip():
-                    student_name = name_element.text.strip()
+                text = name_element.text.strip()
+                if text and len(text) > 3: # التأكد إنه مش نص فارغ
+                    student_name = text
                     break
-            except: continue
+            except: 
+                continue
+                
+        # 2. المحاولة الثانية (الضربة القاضية): السحب من صورة الملف الشخصي
+        if student_name == "طالب جامعي":
+            try:
+                img_elements = driver.find_elements(By.CSS_SELECTOR, "img.userpicture")
+                for img in img_elements:
+                    alt_text = img.get_attribute("alt") or img.get_attribute("title")
+                    if alt_text:
+                        # تنظيف النص من الكلمات الزائدة
+                        clean_name = alt_text.replace("Picture of", "").replace("صورة", "").strip()
+                        if clean_name and len(clean_name) > 3:
+                            student_name = clean_name
+                            break
+            except:
+                pass
 
         if task_type == "timeline":
             links = driver.find_elements(By.CSS_SELECTOR, "a[href*='course/view.php?id=']")
