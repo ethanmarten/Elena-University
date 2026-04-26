@@ -1,5 +1,6 @@
 import json
 import streamlit as st
+import markdown
 import smtplib
 import random
 import json
@@ -874,11 +875,48 @@ with tabs[0]:
                     st.markdown(st.session_state.study_plan)
                     
                     # زر تحميل الخطة كملف
+                    html_content = f"""
+                    <!DOCTYPE html>
+                    <html dir="rtl" lang="ar">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>خطة المذاكرة - {friendly_name}</title>
+                        <style>
+                            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; line-height: 1.8; padding: 20px; }}
+                            .container {{ max-width: 800px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); }}
+                            h1, h2, h3 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; display: inline-block; }}
+                            p {{ font-size: 16px; }}
+                            ul, ol {{ font-size: 16px; background: #fdfdfd; padding: 20px 40px; border-radius: 8px; border-right: 4px solid #3498db; }}
+                            strong {{ color: #e74c3c; }}
+                            .header {{ text-align: center; margin-bottom: 30px; }}
+                            .footer {{ text-align: center; margin-top: 40px; font-size: 0.9em; color: #95a5a6; border-top: 1px solid #eee; padding-top: 20px; }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1 style="border: none;">📅 خطة المذاكرة الأسبوعية الذكية</h1>
+                                <h3 style="border: none; color: #7f8c8d;">تم إعدادها خصيصاً للبطل: {friendly_name} 👑</h3>
+                            </div>
+                            
+                            <!-- هنا يتم وضع الخطة المنظمة -->
+                            {markdown.markdown(st.session_state.study_plan)}
+                            
+                            <div class="footer">
+                                تم التوليد بواسطة مساعدك الذكي <b>إيلينا AI</b> 🤖<br>
+                                <i>تقدر تحفظ هاد الملف كـ PDF من خلال الضغط على (Ctrl+P) واختيار حفظ كـ PDF.</i>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    
+                    # زر التحميل الجديد بالتصميم الفخم
                     st.download_button(
-                        label="📥 تحميل الخطة كملف (Markdown)",
-                        data=st.session_state.study_plan,
-                        file_name=f"study_plan_{friendly_name}.md",
-                        mime="text/markdown",
+                        label="📥 تحميل الخطة بتصميم فخم (Smart Doc)",
+                        data=html_content,
+                        file_name=f"Elena_Study_Plan_{friendly_name}.html",
+                        mime="text/html",
                         use_container_width=True
                     )
 
