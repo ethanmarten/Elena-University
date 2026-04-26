@@ -1069,9 +1069,17 @@ with tabs[3]:
                             answer = resp.choices[0].message.content
                             st.session_state.messages.append({"role": "assistant", "content": answer})
                             
-                            # تفعيل النزول التلقائي للصفحة
-                            st.session_state.scroll_down = True 
-                            st.rerun() 
+                            # خدعة Streamlit للقفز التلقائي إلى الشات
+                            js = f"""
+                            <script>
+                                var element = window.parent.document.getElementById('chat-bottom');
+                                if (element) {{
+                                    element.scrollIntoView({{behavior: "smooth", block: "end", inline: "nearest"}});
+                                }}
+                            </script>
+                            """
+                            st.components.v1.html(js, height=0)
+                            st.rerun()
                         except Exception as e:
                             st.error("مشكلة في الاتصال بإيلينا.")
 
