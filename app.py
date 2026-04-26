@@ -378,7 +378,7 @@ def deep_scan_course(username, password, course_url, progress_callback=None):
         if driver:
             driver.quit()
 
-def run_selenium_task(username, password, task_type="timeline", target_url=None):
+def run_selenium_task(username, password, task_type="timeline", target_url=None, base_url="http://elearning.iugaza.edu.ps"):
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
@@ -394,16 +394,33 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
         service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
         driver = webdriver.Chrome(service=service, options=options)
         
-        driver.get("https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass")
-        time.sleep(3)
-        
-        driver.find_element(By.ID, "username").send_keys(username)
-        p_field = driver.find_element(By.ID, "password")
-        p_field.send_keys(password)
-        p_field.send_keys(Keys.ENTER)
-        
-        time.sleep(15) 
+        # ==========================================
+        # --- نظام الدخول الذكي (متعدد الجامعات) ---
+        # ==========================================
+        if "iugaza.edu.ps" in base_url:
+            # دخول مخصص للجامعة الإسلامية (SSO)
+            driver.get("https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass")
+            time.sleep(3)
+            driver.find_element(By.ID, "username").send_keys(username)
+            p_field = driver.find_element(By.ID, "password")
+            p_field.send_keys(password)
+            p_field.send_keys(Keys.ENTER)
+        else:
+            # دخول افتراضي لأي جامعة بتستخدم Moodle عالمياً
+            login_url = f"{base_url.rstrip('/')}/login/index.php"
+            driver.get(login_url)
+            time.sleep(3)
+            # المودل الافتراضي بيستخدم هدول الـ IDs
+            driver.find_element(By.ID, "username").send_keys(username)
+            p_field = driver.find_element(By.ID, "password")
+            p_field.send_keys(password)
+            p_field.send_keys(Keys.ENTER)
+            
+        time.sleep(15) # الانتظار لحين تحميل الصفحة الرئيسية بعد الدخول
 
+        # ==========================================
+        # --- سحب اسم الطالب ---
+        # ==========================================
         student_name = "طالب جامعي"
         
         # 1. المحاولة الأولى: السحب من النصوص في القائمة العلوية
@@ -432,6 +449,9 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
             except:
                 pass
 
+        # ==========================================
+        # --- تنفيذ المهام حسب الطلب ---
+        # ==========================================
         if task_type == "timeline":
             links = driver.find_elements(By.CSS_SELECTOR, "a[href*='course/view.php?id=']")
             course_map = {}
@@ -480,23 +500,23 @@ def run_selenium_task(username, password, task_type="timeline", target_url=None)
                 return {"course_content": content, "course_links": found_links, "student_name": student_name}
 
         elif task_type == "scrape_pdf":
-                if target_url:
-                    try:
-                        cookies = {c['name']: c['value'] for c in driver.get_cookies()}
-                        response = requests.get(target_url, cookies=cookies, timeout=15)
+            if target_url:
+                try:
+                    cookies = {c['name']: c['value'] for c in driver.get_cookies()}
+                    response = requests.get(target_url, cookies=cookies, timeout=15)
+                    
+                    if response.status_code == 200:
+                        pdf_file = io.BytesIO(response.content)
+                        reader = PdfReader(pdf_file)
+                        pdf_text = ""
+                        for page in reader.pages:
+                            pdf_text += page.extract_text() + "\n"
                         
-                        if response.status_code == 200:
-                            pdf_file = io.BytesIO(response.content)
-                            reader = PdfReader(pdf_file)
-                            pdf_text = ""
-                            for page in reader.pages:
-                                pdf_text += page.extract_text() + "\n"
-                            
-                            return {"pdf_text": pdf_text, "student_name": student_name}
-                        else:
-                            return {"error": f"فشل التحميل، كود الخطأ: {response.status_code}"}
-                    except Exception as e:
-                        return {"error": f"مشكلة في قراءة الـ PDF: {str(e)}"}
+                        return {"pdf_text": pdf_text, "student_name": student_name}
+                    else:
+                        return {"error": f"فشل التحميل، كود الخطأ: {response.status_code}"}
+                except Exception as e:
+                    return {"error": f"مشكلة في قراءة الـ PDF: {str(e)}"}
 
     except Exception as e:
         return {"error": str(e)}
