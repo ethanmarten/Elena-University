@@ -1001,9 +1001,8 @@ with st.sidebar:
                     st.session_state.user_status = "Standard"
                     st.error("⚠️ **انتهى الاشتراك!**")
                     st.rerun() 
-            except: 
+             except: 
                 st.info(f"ينتهي: {expire_str}")
-
     st.markdown("---")
     st.header("⚙️ المزامنة")
     uid = st.text_input("الرقم الجامعي", value=st.session_state.get("u_id", ""))
