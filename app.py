@@ -8,6 +8,7 @@ import io
 import requests
 import sys
 import re
+import streamlit.components.v1 as components
 from urllib.parse import urlparse, parse_qs
 from groq import Groq
 from selenium import webdriver
@@ -950,6 +951,8 @@ with tabs[2]:
         
 with tabs[3]:
     st.subheader("🤖 إيلين - المحلل الأكاديمي العميق")
+    
+    # 1. قاعدة المعرفة
     knowledge_base = st.session_state.get("knowledge_base", {})
     if knowledge_base:
         with st.expander("📚 قاعدة المعرفة الحالية - انقر لعرض التفاصيل", expanded=False):
@@ -974,37 +977,13 @@ with tabs[3]:
     {deep_context}
     {pdf_context}
     """
-    
-    chat_container = st.container()
-    with chat_container:
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]): st.markdown(message["content"])
-
-    if chat_input := st.chat_input("اسألي إيلينا عن أي تفصيل..."):
-        st.session_state.messages.append({"role": "user", "content": chat_input})
-        with chat_container:
-            with st.chat_message("user"): st.markdown(chat_input)
-            with st.chat_message("assistant"):
-                try:
-                    with st.spinner("إيلينا تغوص في الملفات..."):
-                        response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": instruction}] + st.session_state.messages)
-                        answer = response.choices[0].message.content
-                        st.markdown(answer)
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
-                except Exception as e: st.error(f"مشكلة: {e}")
-        st.rerun()
-
-    if st.sidebar.button("🗑️ مسح محادثة إيلينا", key="clear_chat"):
-        st.session_state.messages = []
-        st.rerun()
 
     # ==========================================
-    # --- إضافة ميزة صانع الاختبارات الذكي ---
+    # --- 1. قسم الاختبارات (الآن في الأعلى) ---
     # ==========================================
     st.markdown("---")
     st.subheader("📝 اختبر نفسك (Quiz Generator)")
     
-    # دمج المحتوى للتحليل
     study_context = deep_context + "\n" + pdf_context
     
     if st.button("🧠 ولّدي لي اختبار من هذه الملفات", use_container_width=True):
@@ -1054,7 +1033,7 @@ with tabs[3]:
             st.markdown("---")
             st.write("### 📊 نتيجة الاختبار:")
             score = 0
-            incorrect_questions = [] # لتخزين الأسئلة الخاطئة
+            incorrect_questions = []
             
             for i, q in enumerate(st.session_state.quiz_data):
                 if user_answers[i] == q['correct']:
@@ -1062,10 +1041,9 @@ with tabs[3]:
                     st.success(f"**السؤال {i+1}:** إجابتك صحيحة! 🎉 ({q['correct']})")
                 else:
                     st.error(f"**السؤال {i+1}:** إجابتك خاطئة! ❌ \n\n الإجابة الصحيحة هي: **{q['correct']}**")
-                    incorrect_questions.append(q['question']) # حفظ السؤال الخاطئ
+                    incorrect_questions.append(q['question'])
                 st.info(f"💡 **التوضيح:** {q['explanation']}")
             
-            # تقييم النتيجة
             if score == len(st.session_state.quiz_data):
                 st.balloons()
                 st.success(f"🏆 نتيجتك: {score} من {len(st.session_state.quiz_data)} - أسطورة يا {friendly_name}!")
@@ -1075,28 +1053,69 @@ with tabs[3]:
                 else:
                     st.error(f"💔 نتيجتك: 0 - يبدو إنك محتاج تدرس الملف من أول وجديد يا {friendly_name}!")
                 
-                # زر المراجعة مع إيلينا (يظهر فقط إذا كان هناك أخطاء)
                 st.markdown("---")
                 if st.button("👩‍🏫 راجع الشرح مع إيلينا", use_container_width=True):
-                    # تجهيز رسالة تلقائية لإيلينا
                     failed_q_text = "\n".join([f"- {q}" for q in incorrect_questions])
                     auto_prompt = f"يا إيلينا، لقد أخطأت في الاختبار في هذه المواضيع:\n{failed_q_text}\n\nهل يمكنك إعادة شرحها لي بتبسيط شديد كأنني مبتدئ مع أمثلة؟"
                     
-                    # إضافتها للمحادثة
                     st.session_state.messages.append({"role": "user", "content": auto_prompt})
                     
                     with st.spinner("إيلينا تجهز الشرح المخصص لك..."):
                         try:
-                            # استدعاء إيلينا للرد
                             resp = client.chat.completions.create(
                                 model="llama-3.3-70b-versatile",
                                 messages=[{"role": "system", "content": instruction}] + st.session_state.messages
                             )
                             answer = resp.choices[0].message.content
                             st.session_state.messages.append({"role": "assistant", "content": answer})
-                            st.rerun() # تحديث الصفحة عشان يشوف الشرح في الشات فوق
+                            
+                            # تفعيل النزول التلقائي للصفحة
+                            st.session_state.scroll_down = True 
+                            st.rerun() 
                         except Exception as e:
                             st.error("مشكلة في الاتصال بإيلينا.")
+
+    # ==========================================
+    # --- 2. قسم الدردشة (الآن في الأسفل) ---
+    # ==========================================
+    st.markdown("---")
+    st.subheader("💬 دردش مع إيلينا حول المادة")
+    
+    chat_container = st.container()
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]): st.markdown(message["content"])
+
+    if chat_input := st.chat_input("اسألي إيلينا عن أي تفصيل..."):
+        st.session_state.messages.append({"role": "user", "content": chat_input})
+        with chat_container:
+            with st.chat_message("user"): st.markdown(chat_input)
+            with st.chat_message("assistant"):
+                try:
+                    with st.spinner("إيلينا تغوص في الملفات..."):
+                        response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": instruction}] + st.session_state.messages)
+                        answer = response.choices[0].message.content
+                        st.markdown(answer)
+                        st.session_state.messages.append({"role": "assistant", "content": answer})
+                        st.session_state.scroll_down = True
+                except Exception as e: st.error(f"مشكلة: {e}")
+        st.rerun()
+
+    if st.sidebar.button("🗑️ مسح محادثة إيلينا", key="clear_chat"):
+        st.session_state.messages = []
+        st.rerun()
+
+    # تنفيذ كود النزول التلقائي (Auto-Scroll) لو تم تفعيله
+    if st.session_state.get("scroll_down"):
+        components.html(
+            """
+            <script>
+                // أمر بسيط بينزل الشاشة لآخر الصفحة ببطء وانسيابية
+                window.parent.scrollTo({ top: window.parent.document.body.scrollHeight, behavior: 'smooth' });
+            </script>
+            """, height=0
+        )
+        st.session_state.scroll_down = False # عشان ما ينزل كل مرة
                 
 with tabs[4]:
     if st.session_state.get("user_role") == "developer":
