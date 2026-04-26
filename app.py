@@ -6,6 +6,7 @@ import os
 import io
 import requests
 import sys
+import re
 from urllib.parse import urlparse, parse_qs
 from groq import Groq
 from selenium import webdriver
@@ -662,7 +663,22 @@ user_syncs = db[current_u].get("sync_count", 0) if current_u in db else 0
 badge = '<span class="prime-badge">👑</span>' if st.session_state.user_status == "Prime" else ""
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
-role_name = "إيثان" if st.session_state.get("user_role") == "developer" else "طالب إيلينا"
+raw_name = st.session_state.get("student_name", "طالب جامعي")
+# إزالة الحروف الإنجليزية لو المودل رجع الاسم لغتين
+arabic_name = re.sub(r'[A-Za-z]', '', raw_name).strip()
+name_parts = arabic_name.split()
+
+if st.session_state.get("user_role") == "developer":
+    friendly_name = "إيثان"
+elif len(name_parts) >= 2:
+    # ياخذ الاسم الأول والأخير (مثلاً: ايهاب الحايك)
+    friendly_name = f"{name_parts[0]} {name_parts[-1]}"
+elif len(name_parts) == 1:
+    friendly_name = name_parts[0]
+else:
+    friendly_name = "يا بطل"
+# الترحيب
+role_name = friendly_name
 if st.session_state.get("user_status") == "Prime":
     badge = '<span style="background:#FFD700; color:black; padding:2px 10px; border-radius:10px; font-size:18px; margin-right:10px; font-weight:bold;">PRIME MEMBER 👑</span>'
 else:
