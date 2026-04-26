@@ -36,6 +36,174 @@ MAX_FREE_SYNCS = 10
 PDF_TEXT_LIMIT = 8000
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
+# ==========================================
+# --- 1. تعريف دوال الداتا بيز الأساسية ---
+# ==========================================
+def load_db():
+    """Load user database from JSON file."""
+    if not os.path.exists(DB_FILE):
+        return {}
+    try:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+def save_db(db_data):
+    """Save user database to JSON file."""
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(db_data, f, ensure_ascii=False, indent=4)
+
+# ==========================================
+# --- 2. نظام الصفحات (Routing) والـ CSS ---
+# ==========================================
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'landing'
+
+st.markdown("""
+<style>
+    /* زر الرجوع للأعلى */
+    #myBtn {
+        display: none; position: fixed; bottom: 20px; right: 30px; z-index: 999; 
+        font-size: 22px; border: none; outline: none; background-color: #3498db; 
+        color: white; cursor: pointer; padding: 10px 15px; border-radius: 50%; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3); transition: 0.3s;
+    }
+    #myBtn:hover { background-color: #2980b9; transform: scale(1.1); }
+    
+    /* تصميم صفحة الهبوط */
+    .hero-container { text-align: center; padding: 80px 20px; animation: fadeIn 1.5s; }
+    .hero-title { font-size: 4rem; font-weight: 900; color: #2c3e50; margin-bottom: 10px; }
+    .hero-subtitle { font-size: 1.5rem; color: #7f8c8d; margin-bottom: 40px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+<button onclick="topFunction()" id="myBtn" title="اطلع لفوق">⬆️</button>
+<script>
+    let mybutton = document.getElementById("myBtn");
+    window.addEventListener('scroll', function() {
+        if (window.scrollY > 300 || document.documentElement.scrollTop > 300) {
+            mybutton.style.display = "block";
+        } else {
+            mybutton.style.display = "none";
+        }
+    }, true);
+    function topFunction() {
+        window.parent.document.querySelector('.main .block-container').scrollTo({top: 0, behavior: 'smooth'});
+    }
+</script>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# --- 3. عرض صفحة الهبوط (Landing Page) ---
+# ==========================================
+if st.session_state.current_page == 'landing':
+    st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
+    
+    st.markdown("""
+        <div class="hero-container">
+            <h1 class="hero-title">🤖 إيلينا AI</h1>
+            <p class="hero-subtitle">مساعدك الأكاديمي الذكي اللي رح يغير طريقة دراستك للأبد.</p>
+            <p>تخطيط آلي، تلخيص، اختبارات ذكية، ومزامنة مع جامعتك بضغطة زر!</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 ابدأ مجاناً الآن (إنشاء حساب)", use_container_width=True, type="primary"):
+            st.session_state.current_page = 'register'
+            st.rerun()
+        
+        st.markdown("<div style='text-align: center; margin-top: 15px;'>", unsafe_allow_html=True)
+        if st.button("لديك حساب؟ تسجيل الدخول", use_container_width=True):
+            st.session_state.current_page = 'login'
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.stop() # 🛑 بيوقف الكود هنا
+
+# ==========================================
+# --- 4. عرض صفحة تسجيل الدخول (Login Page) ---
+# ==========================================
+elif st.session_state.current_page == 'login':
+    st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; margin-top: 40px;'>🔑 الدخول إلى إيلينا</h2>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.container(border=True):
+            username_input = st.text_input("اسم المستخدم (حساب إيلينا)")
+            password_input = st.text_input("كلمة المرور", type="password")
+            
+            if st.button("دخول 🚪", use_container_width=True, type="primary"):
+                db = load_db()
+                if username_input in db and db[username_input].get("password") == password_input:
+                    st.session_state.logged_in = True
+                    st.session_state.username = username_input
+                    st.session_state.user_role = db[username_input].get("role", "student")
+                    st.session_state.user_status = db[username_input].get("status", "Standard")
+                    st.session_state.current_page = 'main_app' # حوله للتطبيق!
+                    st.rerun()
+                else:
+                    st.error("❌ بيانات الدخول غير صحيحة!")
+        
+        if st.button("⬅️ رجوع للرئيسية", use_container_width=True):
+            st.session_state.current_page = 'landing'
+            st.rerun()
+            
+    st.stop() # 🛑 بيوقف الكود هنا
+
+# ==========================================
+# --- 5. عرض صفحة إنشاء الحساب (Register) ---
+# ==========================================
+elif st.session_state.current_page == 'register':
+    st.markdown("""<style>[data-testid="collapsedControl"] { display: none; }</style>""", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; margin-top: 40px;'>✨ إنشاء حساب جديد</h2>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.container(border=True):
+            new_user = st.text_input("اسم المستخدم الجديد")
+            new_email = st.text_input("البريد الإلكتروني (اختياري)")
+            new_pass = st.text_input("كلمة المرور", type="password")
+            
+            if st.button("إنشاء حساب ✅", use_container_width=True, type="primary"):
+                if new_user and new_pass:
+                    db = load_db()
+                    if new_user in db:
+                        st.error("❌ اسم المستخدم محجوز، اختر اسماً آخر.")
+                    else:
+                        db[new_user] = {
+                            "password": new_pass,
+                            "email": new_email,
+                            "role": "student",
+                            "status": "Standard"
+                        }
+                        save_db(db)
+                        st.success("🎉 تم إنشاء الحساب بنجاح! جاري تحويلك...")
+                        # تسجيل الدخول تلقائياً بعد إنشاء الحساب
+                        st.session_state.logged_in = True
+                        st.session_state.username = new_user
+                        st.session_state.user_role = "student"
+                        st.session_state.user_status = "Standard"
+                        st.session_state.current_page = 'main_app'
+                        import time; time.sleep(1.5)
+                        st.rerun()
+                else:
+                    st.warning("⚠️ يرجى تعبئة اسم المستخدم وكلمة المرور.")
+        
+        if st.button("⬅️ رجوع للرئيسية", use_container_width=True):
+            st.session_state.current_page = 'landing'
+            st.rerun()
+            
+    st.stop() # 🛑 بيوقف الكود هنا
+
+# ==========================================
+# --- 6. التطبيق الرئيسي (Main App) ---
+# ==========================================
+# إظهار القائمة الجانبية لأننا دخلنا التطبيق
+st.markdown("""<style>[data-testid="collapsedControl"] { display: block; }</style>""", unsafe_allow_html=True)
+
 # --- 2. تعريف جميع الدوال أولاً لتجنب NameError ---
 
 def load_db():
