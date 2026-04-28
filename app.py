@@ -44,6 +44,15 @@ PDF_TEXT_LIMIT = 8000
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ==========================================
+# --- حدود الاستخدام اليومي ---
+# ==========================================
+STANDARD_LIMIT_TIMELINE = 10
+STANDARD_LIMIT_BROWSE = 10
+STANDARD_LIMIT_CHAT = 10
+PRIME_LIMIT_ACTIONS = 200   # مشترك بين timeline + browse
+PRIME_LIMIT_CHAT = 100
+
+# ==========================================
 # --- إعداد الكوكيز (مرة واحدة فقط) ---
 # ==========================================
 cookies = EncryptedCookieManager(prefix="elena", password="EM2006_secret_key")
@@ -795,6 +804,63 @@ def get_local_time():
     local_tz = pytz.timezone('Asia/Gaza')
     return datetime.now(local_tz)
 
+def get_today_str():
+    """Returns the current local date as YYYY-MM-DD string."""
+    return get_local_time().strftime("%Y-%m-%d")
+
+def get_user_daily_counters(db, username):
+    """Return daily usage counters for a user, resetting them if the date has changed."""
+    if username not in db or not isinstance(db.get(username), dict):
+        return {"timeline": 0, "browse": 0, "chat": 0}
+    user_data = db[username]
+    today = get_today_str()
+    if user_data.get("daily_date") != today:
+        user_data["daily_date"] = today
+        user_data["daily_timeline_count"] = 0
+        user_data["daily_browse_count"] = 0
+        user_data["daily_chat_count"] = 0
+        db[username] = user_data
+        save_db(db)
+    return {
+        "timeline": user_data.get("daily_timeline_count", 0),
+        "browse":   user_data.get("daily_browse_count", 0),
+        "chat":     user_data.get("daily_chat_count", 0),
+    }
+
+def increment_daily_counter(db, username, counter_type):
+    """Increment a daily counter ('timeline', 'browse', or 'chat') in the DB."""
+    if username not in db or not isinstance(db.get(username), dict):
+        return
+    user_data = db[username]
+    today = get_today_str()
+    if user_data.get("daily_date") != today:
+        user_data["daily_date"] = today
+        user_data["daily_timeline_count"] = 0
+        user_data["daily_browse_count"] = 0
+        user_data["daily_chat_count"] = 0
+    key = f"daily_{counter_type}_count"
+    user_data[key] = user_data.get(key, 0) + 1
+    db[username] = user_data
+    save_db(db)
+
+def get_quota_remaining(counters, status, action_type):
+    """Return (remaining, limit) for the given action and user status."""
+    if status == "Prime":
+        if action_type in ("timeline", "browse"):
+            limit   = PRIME_LIMIT_ACTIONS
+            current = counters["timeline"] + counters["browse"]
+        else:
+            limit   = PRIME_LIMIT_CHAT
+            current = counters["chat"]
+    else:
+        if action_type == "timeline":
+            limit, current = STANDARD_LIMIT_TIMELINE, counters["timeline"]
+        elif action_type == "browse":
+            limit, current = STANDARD_LIMIT_BROWSE, counters["browse"]
+        else:
+            limit, current = STANDARD_LIMIT_CHAT, counters["chat"]
+    return limit - current, limit
+
 def get_groq_api_key():
     env_key = os.environ.get("GROQ_API_KEY")
     if env_key:
@@ -900,8 +966,6 @@ if st.session_state.get("user_status") == "Prime":
             st.warning("⚠️ انتهت مدة اشتراكك البريميوم، تم تحويل حسابك للوضع المجاني.")
             st.rerun()
 
-user_syncs = db[current_u].get("sync_count", 0) if current_u in db else 0
-
 badge = '<span class="prime-badge">👑</span>' if st.session_state.user_status == "Prime" else ""
 st.markdown(f"## Elena Student AI {badge}", unsafe_allow_html=True)
 
@@ -983,28 +1047,221 @@ if st.session_state.user_status == "Standard":
                     st.session_state.user_status = "Prime"
                     st.success(f"✅ تم التفعيل بنجاح! ينتهي اشتراكك في: {expire_date.strftime('%Y/%m/%d - %I:%M %p')}")
                     st.rerun()
-                    
+
+# ==========================================
+# --- فحص الحصص اليومية ---
+# ==========================================
+db = load_db()
+_daily_counters = get_user_daily_counters(db, current_u)
+_standard_blocked = False
+_blocked_msg = ""
+
 if st.session_state.user_role != "developer" and st.session_state.user_status != "Prime":
-    remaining = 10 - user_syncs
-    st.sidebar.metric("المزامنات المتبقية", f"{remaining} / 10")
-    if remaining <= 0:
-        st.error("🚫 انتهت محاولاتك المجانية. يرجى الترقية.")
-        up_c = st.text_input("كود التفعيل:")
-        if st.button("تفعيل"):
-            if up_c in st.session_state.IF_VALID_CODES:
-                db[current_u]["status"] = "Prime"
-                save_db(db)
-                st.rerun()
-        st.stop()
+    _tl_rem, _ = get_quota_remaining(_daily_counters, "Standard", "timeline")
+    _br_rem, _ = get_quota_remaining(_daily_counters, "Standard", "browse")
+    _ch_rem, _ = get_quota_remaining(_daily_counters, "Standard", "chat")
+    if _tl_rem <= 0:
+        _standard_blocked = True
+        _blocked_msg = "🚫 لقد استنفدت حد الاستخدام اليومي لسحب المخطط الزمني."
+    elif _br_rem <= 0:
+        _standard_blocked = True
+        _blocked_msg = "🚫 لقد استنفدت حد الاستخدام اليومي للتصفح السريع."
+    elif _ch_rem <= 0:
+        _standard_blocked = True
+        _blocked_msg = "🚫 لقد استنفدت حد الاستخدام اليومي لمحادثات إيلينا."
+
+# --- 6. السايدبار (Sidebar) - يُعرض دائماً قبل أي st.stop() ---
+with st.sidebar:
+    st.markdown("---")
+    # ==========================================
+    # --- 1. نظام اشتراك برايم (Prime) ---
+    # ==========================================
+    if st.session_state.get("user_status") == "Prime":
+        db = load_db()
+        current_u = st.session_state.get("username", "user")
+        expire_str = db.get(current_u, {}).get("expire_at")
+        if expire_str:
+             try:
+                dt_obj = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
+                time_diff = dt_obj - get_local_time().replace(tzinfo=None)
+
+                if time_diff.total_seconds() > 0:
+                    days = time_diff.days
+                    hours, remainder = divmod(time_diff.seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+
+                    time_parts = []
+                    if days > 0: time_parts.append(f"{days} يوم")
+                    if hours > 0: time_parts.append(f"{hours} ساعة")
+                    if minutes > 0: time_parts.append(f"{minutes} دقيقة")
+                    time_parts.append(f"{seconds} ثانية")
+
+                    time_left = " و ".join(time_parts)
+
+                    st.success(f"👑 **برايم نشطة**\n\n⏳ **ينتهي خلال:**\n {time_left}\n\n📅 **التاريخ:** {dt_obj.strftime('%Y/%m/%d - %I:%M %p')}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    db[current_u]["status"] = "Standard"
+                    save_db(db)
+                    st.session_state.user_status = "Standard"
+                    st.error("⚠️ **انتهى الاشتراك!**")
+                    st.rerun()
+             except:
+                st.info(f"ينتهي: {expire_str}")
+    st.markdown("---")
+
+    # ==========================================
+    # --- استخداماتك اليومية (للمستخدم القياسي) ---
+    # ==========================================
+    if st.session_state.get("user_role") != "developer" and st.session_state.get("user_status") != "Prime":
+        _sb_db = load_db()
+        _sb_cu = st.session_state.get("username", "user")
+        _sb_ctrs = get_user_daily_counters(_sb_db, _sb_cu)
+        _sb_tl = STANDARD_LIMIT_TIMELINE - _sb_ctrs["timeline"]
+        _sb_br = STANDARD_LIMIT_BROWSE - _sb_ctrs["browse"]
+        _sb_ch = STANDARD_LIMIT_CHAT - _sb_ctrs["chat"]
+        st.markdown("### 📊 استخداماتك اليومية")
+        st.metric("📅 سحب المخطط المتبقي", f"{max(0, _sb_tl)} / {STANDARD_LIMIT_TIMELINE}")
+        st.metric("🔍 التصفح السريع المتبقي", f"{max(0, _sb_br)} / {STANDARD_LIMIT_BROWSE}")
+        st.metric("💬 محادثات إيلينا المتبقية", f"{max(0, _sb_ch)} / {STANDARD_LIMIT_CHAT}")
+        st.markdown("---")
+
+    # ==========================================
+    # --- 2. اختيار الجامعة المتعددة ---
+    # ==========================================
+    st.header("🏫 اختر جامعتك")
+    db = load_db()
+    if "universities" not in db:
+        db["universities"] = {
+            "الجامعة الإسلامية بغزة": {"url": "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass", "logo": "🎓"}
+        }
+        save_db(db)
+
+    universities = db.get("universities", {})
+    uni_list = list(universities.keys()) + ["➕ إضافة رابط جامعة جديدة"]
+
+    selected_uni = st.selectbox("🏛️ الجامعة:", uni_list)
+
+    if selected_uni == "➕ إضافة رابط جامعة جديدة":
+        with st.expander("🔗 إضافة مودل جامعة جديدة", expanded=True):
+            new_uni_name = st.text_input("اسم الجامعة (مثال: جامعة الأزهر):")
+            new_uni_url = st.text_input("رابط المودل (مثال: https://moodle.univ.edu):")
+            if st.button("حفظ الجامعة 💾", use_container_width=True):
+                if new_uni_name and new_uni_url:
+                    clean_url = new_uni_url.strip().rstrip('/')
+                    if not clean_url.startswith("http"):
+                        clean_url = "https://" + clean_url
+                    db["universities"][new_uni_name] = {"url": clean_url, "logo": "🌍"}
+                    save_db(db)
+                    st.success("✅ تمت الإضافة بنجاح! جاري التحديث...")
+                    time.sleep(1); st.rerun()
+                else:
+                    st.warning("⚠️ يرجى تعبئة جميع الحقول.")
+        st.session_state.moodle_url = "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass"
+    else:
+        st.session_state.moodle_url = universities[selected_uni]["url"]
+        st.markdown(f"**الرابط:** `{st.session_state.moodle_url}`")
+
+    st.markdown("---")
+
+    # ==========================================
+    # --- 3. تسجيل الدخول والمزامنة ---
+    # ==========================================
+    st.header("⚙️ المزامنة مع المودل")
+    uid = st.text_input("الرقم الجامعي", value=st.session_state.get("u_id", ""))
+    upass = st.text_input("كلمة المرور", type="password", value=st.session_state.get("u_pass", ""))
+
+    if st.button("🚀 Sync Now", use_container_width=True) and uid and upass:
+        with st.spinner(f"جاري الدخول لمودل ({selected_uni})..."):
+            moodle_link = st.session_state.get("moodle_url", "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass")
+            res = run_selenium_task(uid, upass, "timeline", base_url=moodle_link)
+
+            if res and "courses" in res:
+                st.session_state.update({
+                    "u_id": uid,
+                    "u_pass": upass,
+                    "my_real_courses": res['courses'],
+                    "user_schedule": res.get('timeline_list', []),
+                    "student_name": res.get('student_name', 'مستخدم'),
+                    "is_synced": True
+                })
+                st.success("✅ تم الربط بنجاح!"); time.sleep(1); st.rerun()
+            else:
+                st.error("❌ فشلت المزامنة. تأكد من البيانات أو توافق رابط الجامعة.")
+
+    with st.expander("⚙️ الإعدادات المتقدمة"):
+        if st.button("🔴 تسجيل الخروج النهائي", use_container_width=True):
+            cookies["username"] = ""
+            cookies.save()
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.session_state["is_logged_in"] = False
+            st.components.v1.html(
+                """
+                <script>
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1000);
+                </script>
+                """,
+                height=0
+            )
+            st.warning("🔄 جاري تسجيل الخروج ومسح البيانات , الرجاء عمل ريفرش للصفحة للخروج...")
+            st.stop()
+
+# --- عرض رسالة الحجب للمستخدم القياسي الذي استنفد حدوده ---
+if _standard_blocked:
+    st.markdown("---")
+    st.error(_blocked_msg + " يرجى الترقية إلى برايم للمتابعة.")
+    st.info("💡 **للترقية:** تواصل عبر [واتساب](https://wa.me/+972594820775) أو أدخل كود التفعيل من القائمة الجانبية.")
+    st.stop()
 
 tabs = st.tabs(["📅 المخطط الذكي", "📚 المقررات", "📊 الدرجات", "💬 Ask Elena", "🛠️ الإدارة"])
 
 with tabs[0]:
     st.subheader("📅 المخطط الزمني الذكي")
+    _exec_timeline = False
     if st.button("🔄 سحب المخطط والفعاليات القادمة", use_container_width=True):
+        _role_q = st.session_state.get("user_role", "user")
+        _status_q = st.session_state.get("user_status", "Standard")
+        if _role_q == "developer":
+            _exec_timeline = True
+        else:
+            _db_q = load_db()
+            _ctrs_q = get_user_daily_counters(_db_q, current_u)
+            _rem_q, _lim_q = get_quota_remaining(_ctrs_q, _status_q, "timeline")
+            if _rem_q <= 0:
+                if _status_q == "Prime":
+                    st.error("🚫 لقد وصلت للحد اليومي المسموح به لسحب المخطط. يرجى المحاولة غداً.")
+                else:
+                    st.error(f"🚫 انتهت محاولات سحب المخطط اليومية ({_lim_q} ضغطة). يرجى الترقية.")
+            elif _rem_q == 2:
+                st.session_state["warn_pending_timeline"] = True
+            else:
+                _exec_timeline = True
+
+    if st.session_state.get("warn_pending_timeline"):
+        _db_wt = load_db()
+        _ctrs_wt = get_user_daily_counters(_db_wt, current_u)
+        _rem_wt, _lim_wt = get_quota_remaining(_ctrs_wt, st.session_state.user_status, "timeline")
+        st.warning(f"⚠️ تنبيه: لم يتبق لك سوى {_rem_wt} استخدام(ات) اليوم من أصل {_lim_wt} لسحب المخطط. هل تريد الاستمرار؟")
+        _wt1, _wt2 = st.columns(2)
+        with _wt1:
+            if st.button("تخطي/متابعة ✅", key="btn_proceed_timeline"):
+                st.session_state.pop("warn_pending_timeline", None)
+                _exec_timeline = True
+        with _wt2:
+            if st.button("إلغاء ❌", key="btn_cancel_timeline"):
+                st.session_state.pop("warn_pending_timeline", None)
+
+    if _exec_timeline:
         uid = st.session_state.get("u_id")
         upass = st.session_state.get("u_pass")
         if uid and upass:
+            if st.session_state.get("user_role") != "developer":
+                _db_tincr = load_db()
+                increment_daily_counter(_db_tincr, current_u, "timeline")
             with st.spinner("إيلينا تجمع جدولك ومهامك القادمة..."):
                 res = run_selenium_task(uid, upass, "timeline")
                 if res and "timeline" in res:
@@ -1189,37 +1446,80 @@ with tabs[1]:
         col_browse, col_deep = st.columns(2)
         with col_browse:
             if st.button("🔍 تصفح سريع", use_container_width=True):
-                uid, upass = st.session_state.get("u_id"), st.session_state.get("u_pass")
-                if uid and upass:
-                    with st.spinner("جاري سحب الملفات والروابط..."):
-                        res = run_selenium_task(uid, upass, "browse", course_url)
-                        if res and "course_content" in res:
-                            st.session_state.current_course_content, st.session_state.current_course_links = res["course_content"], res.get("course_links", [])
-                            st.session_state.summarized_items = [] 
-                            st.success("✨ تم سحب محتوى المادة بنجاح!")
-                else: st.error("⚠️ بيانات المودل غير متوفرة، أعد المزامنة.")
+                _role_b = st.session_state.get("user_role", "user")
+                _status_b = st.session_state.get("user_status", "Standard")
+                if _role_b == "developer":
+                    st.session_state["exec_browse"] = True
+                else:
+                    _db_b = load_db()
+                    _ctrs_b = get_user_daily_counters(_db_b, current_u)
+                    _rem_b, _lim_b = get_quota_remaining(_ctrs_b, _status_b, "browse")
+                    if _rem_b <= 0:
+                        if _status_b == "Prime":
+                            st.error("🚫 لقد وصلت للحد اليومي للتصفح. يرجى المحاولة غداً.")
+                        else:
+                            st.error(f"🚫 انتهت محاولات التصفح السريع اليومية ({_lim_b} ضغطة). يرجى الترقية.")
+                    elif _rem_b == 2:
+                        st.session_state["warn_pending_browse"] = True
+                    else:
+                        st.session_state["exec_browse"] = True
         with col_deep:
             if st.button("🧠 مسح عميق (Deep Scan)", use_container_width=True, type="primary"):
-                uid, upass = st.session_state.get("u_id"), st.session_state.get("u_pass")
-                if uid and upass:
-                    progress_placeholder = st.empty()
-                    status_text = st.empty()
-                    def update_progress(msg):
-                        st.session_state.deep_scan_progress.append(msg)
-                        status_text.text(msg)
-                    with st.spinner(f"🚀 جاري المسح العميق لمادة {selected_course}..."):
-                        st.session_state.deep_scan_progress = []
-                        result = deep_scan_course(uid, upass, course_url, update_progress)
-                        if result.get("success"):
-                            if selected_course not in st.session_state.knowledge_base: st.session_state.knowledge_base[selected_course] = {}
-                            st.session_state.knowledge_base[selected_course] = result["knowledge_base"]
-                            st.success(f"✅ تم المسح العميق بنجاح! تم استخراج {len(result['knowledge_base'])} عنصر.")
-                            st.balloons()
-                            with st.expander("📊 ملخص المسح العميق"):
-                                for name, data in result["knowledge_base"].items():
-                                    st.write(f"{'📺' if data['type'] == 'video' else '📄' if data['type'] == 'pdf' else '📃'} **{name}** - {len(data['content'])} حرف")
-                        else: st.error(f"❌ {result.get('error', 'فشل المسح')}")
-                else: st.warning("⚠️ يرجى المزامنة مع المودل أولاً.")
+                if st.session_state.get("user_status") != "Prime" and st.session_state.get("user_role") != "developer":
+                    st.error("🔒 ميزة المسح العميق متاحة لأعضاء برايم فقط. يرجى الترقية للاستمتاع بها.")
+                else:
+                    uid, upass = st.session_state.get("u_id"), st.session_state.get("u_pass")
+                    if uid and upass:
+                        progress_placeholder = st.empty()
+                        status_text = st.empty()
+                        def update_progress(msg):
+                            st.session_state.deep_scan_progress.append(msg)
+                            status_text.text(msg)
+                        with st.spinner(f"🚀 جاري المسح العميق لمادة {selected_course}..."):
+                            st.session_state.deep_scan_progress = []
+                            result = deep_scan_course(uid, upass, course_url, update_progress)
+                            if result.get("success"):
+                                if selected_course not in st.session_state.knowledge_base: st.session_state.knowledge_base[selected_course] = {}
+                                st.session_state.knowledge_base[selected_course] = result["knowledge_base"]
+                                st.success(f"✅ تم المسح العميق بنجاح! تم استخراج {len(result['knowledge_base'])} عنصر.")
+                                st.balloons()
+                                with st.expander("📊 ملخص المسح العميق"):
+                                    for name, data in result["knowledge_base"].items():
+                                        st.write(f"{'📺' if data['type'] == 'video' else '📄' if data['type'] == 'pdf' else '📃'} **{name}** - {len(data['content'])} حرف")
+                            else: st.error(f"❌ {result.get('error', 'فشل المسح')}")
+                    else: st.warning("⚠️ يرجى المزامنة مع المودل أولاً.")
+
+        # تحذير التصفح السريع (يظهر عند بقاء استخدامين)
+        if st.session_state.get("warn_pending_browse"):
+            _db_wb = load_db()
+            _ctrs_wb = get_user_daily_counters(_db_wb, current_u)
+            _rem_wb, _lim_wb = get_quota_remaining(_ctrs_wb, st.session_state.user_status, "browse")
+            st.warning(f"⚠️ تنبيه: لم يتبق لك سوى {_rem_wb} استخدام(ات) اليوم من أصل {_lim_wb} للتصفح السريع. هل تريد الاستمرار؟")
+            _wb1, _wb2 = st.columns(2)
+            with _wb1:
+                if st.button("تخطي/متابعة ✅", key="btn_proceed_browse"):
+                    st.session_state.pop("warn_pending_browse", None)
+                    st.session_state["exec_browse"] = True
+            with _wb2:
+                if st.button("إلغاء ❌", key="btn_cancel_browse"):
+                    st.session_state.pop("warn_pending_browse", None)
+
+        # تنفيذ التصفح السريع
+        if st.session_state.get("exec_browse"):
+            st.session_state.pop("exec_browse", None)
+            uid, upass = st.session_state.get("u_id"), st.session_state.get("u_pass")
+            if uid and upass:
+                if st.session_state.get("user_role") != "developer":
+                    _db_bincr = load_db()
+                    increment_daily_counter(_db_bincr, current_u, "browse")
+                with st.spinner("جاري سحب الملفات والروابط..."):
+                    res = run_selenium_task(uid, upass, "browse", course_url)
+                    if res and "course_content" in res:
+                        st.session_state.current_course_content, st.session_state.current_course_links = res["course_content"], res.get("course_links", [])
+                        st.session_state.summarized_items = []
+                        st.success("✨ تم سحب محتوى المادة بنجاح!")
+            else:
+                st.error("⚠️ بيانات المودل غير متوفرة، أعد المزامنة.")
 
     if st.session_state.get("current_course_links"):
         st.write(f"### 📄 الملفات والروابط المكتشفة:")
