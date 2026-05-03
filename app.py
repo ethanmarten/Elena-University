@@ -51,6 +51,7 @@ STANDARD_LIMIT_BROWSE = 10
 STANDARD_LIMIT_CHAT = 10
 PRIME_LIMIT_ACTIONS = 200   # مشترك بين timeline + browse
 PRIME_LIMIT_CHAT = 100
+WARNING_THRESHOLD = 2   # عدد الاستخدامات المتبقية الذي يُظهر تحذير التخطي
 
 # ==========================================
 # --- إعداد الكوكيز (مرة واحدة فقط) ---
@@ -1236,7 +1237,7 @@ with tabs[0]:
                     st.error("🚫 لقد وصلت للحد اليومي المسموح به لسحب المخطط. يرجى المحاولة غداً.")
                 else:
                     st.error(f"🚫 انتهت محاولات سحب المخطط اليومية ({_lim_q} ضغطة). يرجى الترقية.")
-            elif _rem_q == 2:
+            elif _rem_q == WARNING_THRESHOLD:
                 st.session_state["warn_pending_timeline"] = True
             else:
                 _exec_timeline = True
@@ -1459,7 +1460,7 @@ with tabs[1]:
                             st.error("🚫 لقد وصلت للحد اليومي للتصفح. يرجى المحاولة غداً.")
                         else:
                             st.error(f"🚫 انتهت محاولات التصفح السريع اليومية ({_lim_b} ضغطة). يرجى الترقية.")
-                    elif _rem_b == 2:
+                    elif _rem_b == WARNING_THRESHOLD:
                         st.session_state["warn_pending_browse"] = True
                     else:
                         st.session_state["exec_browse"] = True
@@ -1629,8 +1630,45 @@ with tabs[3]:
         if not study_context.strip():
             st.warning(f"⚠️ يا {friendly_name}، يرجى إضافة ملفات لقاعدة المعرفة أو المزامنة مع المودل أولاً!")
         else:
-            with st.spinner("⏳ إيلينا تقوم بتحليل المحتوى وتجهيز أسئلة ذكية..."):
-                quiz_prompt = f"""
+            _role_quiz = st.session_state.get("user_role", "user")
+            _status_quiz = st.session_state.get("user_status", "Standard")
+            _allow_quiz = False
+            if _role_quiz == "developer":
+                _allow_quiz = True
+            else:
+                _db_quiz = load_db()
+                _ctrs_quiz = get_user_daily_counters(_db_quiz, current_u)
+                _rem_quiz, _lim_quiz = get_quota_remaining(_ctrs_quiz, _status_quiz, "chat")
+                if _rem_quiz <= 0:
+                    if _status_quiz == "Prime":
+                        st.error("🚫 لقد وصلت للحد اليومي لمحادثات إيلينا. يرجى المحاولة غداً.")
+                    else:
+                        st.error(f"🚫 انتهت رصيدك اليومي من محادثات إيلينا ({_lim_quiz} استخدام). يرجى الترقية.")
+                elif _rem_quiz == WARNING_THRESHOLD:
+                    st.session_state["warn_pending_quiz"] = True
+                else:
+                    _allow_quiz = True
+
+            if st.session_state.get("warn_pending_quiz"):
+                _db_wqz = load_db()
+                _ctrs_wqz = get_user_daily_counters(_db_wqz, current_u)
+                _rem_wqz, _lim_wqz = get_quota_remaining(_ctrs_wqz, st.session_state.user_status, "chat")
+                st.warning(f"⚠️ تنبيه: لم يتبق لك سوى {_rem_wqz} استخدام(ات) اليوم من أصل {_lim_wqz} لمحادثات إيلينا. هل تريد الاستمرار؟")
+                _qz1, _qz2 = st.columns(2)
+                with _qz1:
+                    if st.button("تخطي/متابعة ✅", key="btn_proceed_quiz"):
+                        st.session_state.pop("warn_pending_quiz", None)
+                        _allow_quiz = True
+                with _qz2:
+                    if st.button("إلغاء ❌", key="btn_cancel_quiz"):
+                        st.session_state.pop("warn_pending_quiz", None)
+
+            if _allow_quiz:
+                if _role_quiz != "developer":
+                    _db_qincr = load_db()
+                    increment_daily_counter(_db_qincr, current_u, "chat")
+                with st.spinner("⏳ إيلينا تقوم بتحليل المحتوى وتجهيز أسئلة ذكية..."):
+                    quiz_prompt = f"""
                 بناءً على هذا المحتوى، قم بإنشاء 3 أسئلة خيارات متعددة (MCQ).
                 يجب أن يكون الرد بصيغة JSON فقط بهذا الشكل بالضبط بدون أي نصوص إضافية:
                 [
@@ -1639,22 +1677,22 @@ with tabs[3]:
                 المحتوى:
                 {study_context[:6000]}
                 """
-                try:
-                    response = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": quiz_prompt}],
-                        temperature=0.3
-                    )
-                    quiz_json = response.choices[0].message.content.strip()
-                    
-                    if quiz_json.startswith("```json"): quiz_json = quiz_json[7:-3].strip()
-                    elif quiz_json.startswith("```"): quiz_json = quiz_json[3:-3].strip()
-                        
-                    st.session_state.quiz_data = json.loads(quiz_json)
-                    st.session_state.quiz_submitted = False
-                    st.rerun() 
-                except Exception as e:
-                    st.error("❌ حدث خطأ أثناء توليد الاختبار، يرجى المحاولة مرة أخرى.")
+                    try:
+                        response = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role": "user", "content": quiz_prompt}],
+                            temperature=0.3
+                        )
+                        quiz_json = response.choices[0].message.content.strip()
+
+                        if quiz_json.startswith("```json"): quiz_json = quiz_json[7:-3].strip()
+                        elif quiz_json.startswith("```"): quiz_json = quiz_json[3:-3].strip()
+
+                        st.session_state.quiz_data = json.loads(quiz_json)
+                        st.session_state.quiz_submitted = False
+                        st.rerun()
+                    except Exception as e:
+                        st.error("❌ حدث خطأ أثناء توليد الاختبار، يرجى المحاولة مرة أخرى.")
 
     if "quiz_data" in st.session_state:
         st.write("### 🎯 أجب عن الأسئلة التالية:")
@@ -1734,19 +1772,56 @@ with tabs[3]:
             with st.chat_message(message["role"]): st.markdown(message["content"])
 
     if chat_input := st.chat_input("اسألي إيلينا عن أي تفصيل..."):
-        st.session_state.messages.append({"role": "user", "content": chat_input})
-        with chat_container:
-            with st.chat_message("user"): st.markdown(chat_input)
-            with st.chat_message("assistant"):
-                try:
-                    with st.spinner("إيلينا تغوص في الملفات..."):
-                        response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": instruction}] + st.session_state.messages)
-                        answer = response.choices[0].message.content
-                        st.markdown(answer)
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
-                        st.session_state.scroll_down = True
-                except Exception as e: st.error(f"مشكلة: {e}")
-        st.rerun()
+        _role_chat = st.session_state.get("user_role", "user")
+        _status_chat = st.session_state.get("user_status", "Standard")
+        _chat_blocked = False
+        if _role_chat != "developer":
+            _db_chat = load_db()
+            _ctrs_chat = get_user_daily_counters(_db_chat, current_u)
+            _rem_chat, _lim_chat = get_quota_remaining(_ctrs_chat, _status_chat, "chat")
+            if _rem_chat <= 0:
+                if _status_chat == "Prime":
+                    st.error("🚫 لقد وصلت للحد اليومي لمحادثات إيلينا. يرجى المحاولة غداً.")
+                else:
+                    st.error(f"🚫 انتهى رصيدك اليومي من محادثات إيلينا ({_lim_chat} رسالة). يرجى الترقية.")
+                _chat_blocked = True
+            elif _rem_chat == WARNING_THRESHOLD:
+                st.session_state["warn_pending_chat"] = True
+                st.session_state["pending_chat_msg"] = chat_input
+
+        if st.session_state.get("warn_pending_chat") and not _chat_blocked:
+            _db_wch = load_db()
+            _ctrs_wch = get_user_daily_counters(_db_wch, current_u)
+            _rem_wch, _lim_wch = get_quota_remaining(_ctrs_wch, st.session_state.user_status, "chat")
+            st.warning(f"⚠️ تنبيه: لم يتبق لك سوى {_rem_wch} رسالة(رسائل) اليوم من أصل {_lim_wch} لمحادثات إيلينا. هل تريد الاستمرار؟")
+            _ch1, _ch2 = st.columns(2)
+            with _ch1:
+                if st.button("تخطي/متابعة ✅", key="btn_proceed_chat"):
+                    st.session_state.pop("warn_pending_chat", None)
+                    chat_input = st.session_state.pop("pending_chat_msg", chat_input)
+            with _ch2:
+                if st.button("إلغاء ❌", key="btn_cancel_chat"):
+                    st.session_state.pop("warn_pending_chat", None)
+                    st.session_state.pop("pending_chat_msg", None)
+                    _chat_blocked = True
+
+        if not _chat_blocked and not st.session_state.get("warn_pending_chat"):
+            if _role_chat != "developer":
+                _db_chincr = load_db()
+                increment_daily_counter(_db_chincr, current_u, "chat")
+            st.session_state.messages.append({"role": "user", "content": chat_input})
+            with chat_container:
+                with st.chat_message("user"): st.markdown(chat_input)
+                with st.chat_message("assistant"):
+                    try:
+                        with st.spinner("إيلينا تغوص في الملفات..."):
+                            response = client.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": instruction}] + st.session_state.messages)
+                            answer = response.choices[0].message.content
+                            st.markdown(answer)
+                            st.session_state.messages.append({"role": "assistant", "content": answer})
+                            st.session_state.scroll_down = True
+                    except Exception as e: st.error(f"مشكلة: {e}")
+            st.rerun()
 
     if st.sidebar.button("🗑️ مسح محادثة إيلينا", key="clear_chat"):
         st.session_state.messages = []
@@ -1828,137 +1903,3 @@ with tabs[4]:
         # ==========================================
         with st.expander("⚙️ عرض قاعدة البيانات كاملة (للمطورين فقط)"):
             st.json(db)
-
-# --- 6. السايدبار (Sidebar) ---
-with st.sidebar:
-    st.markdown("---")
-    # ==========================================
-    # --- 1. نظام اشتراك برايم (Prime) ---
-    # ==========================================
-    if st.session_state.get("user_status") == "Prime":
-        db = load_db() 
-        current_u = st.session_state.get("username", "user")
-        expire_str = db.get(current_u, {}).get("expire_at")
-        if expire_str:
-             try:
-                dt_obj = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
-                time_diff = dt_obj - get_local_time().replace(tzinfo=None)
-                
-                if time_diff.total_seconds() > 0:
-                    days = time_diff.days
-                    hours, remainder = divmod(time_diff.seconds, 3600)
-                    minutes, seconds = divmod(remainder, 60)
-                    
-                    time_parts = []
-                    if days > 0: time_parts.append(f"{days} يوم")
-                    if hours > 0: time_parts.append(f"{hours} ساعة")
-                    if minutes > 0: time_parts.append(f"{minutes} دقيقة")
-                    time_parts.append(f"{seconds} ثانية")
-                    
-                    time_left = " و ".join(time_parts)
-                    
-                    st.success(f"👑 **برايم نشطة**\n\n⏳ **ينتهي خلال:**\n {time_left}\n\n📅 **التاريخ:** {dt_obj.strftime('%Y/%m/%d - %I:%M %p')}")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    db[current_u]["status"] = "Standard"
-                    save_db(db)
-                    st.session_state.user_status = "Standard"
-                    st.error("⚠️ **انتهى الاشتراك!**")
-                    st.rerun() 
-             except: 
-                st.info(f"ينتهي: {expire_str}")
-    st.markdown("---")
-    
-    # ==========================================
-    # --- 2. اختيار الجامعة المتعددة ---
-    # ==========================================
-    st.header("🏫 اختر جامعتك")
-    db = load_db()
-    if "universities" not in db:
-        # الجامعة الافتراضية
-        db["universities"] = {
-            "الجامعة الإسلامية بغزة": {"url": "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass", "logo": "🎓"}
-        }
-        save_db(db)
-        
-    universities = db.get("universities", {})
-    uni_list = list(universities.keys()) + ["➕ إضافة رابط جامعة جديدة"]
-    
-    selected_uni = st.selectbox("🏛️ الجامعة:", uni_list)
-    
-    if selected_uni == "➕ إضافة رابط جامعة جديدة":
-        with st.expander("🔗 إضافة مودل جامعة جديدة", expanded=True):
-            new_uni_name = st.text_input("اسم الجامعة (مثال: جامعة الأزهر):")
-            new_uni_url = st.text_input("رابط المودل (مثال: https://moodle.univ.edu):")
-            if st.button("حفظ الجامعة 💾", use_container_width=True):
-                if new_uni_name and new_uni_url:
-                    clean_url = new_uni_url.strip().rstrip('/')
-                    if not clean_url.startswith("http"):
-                        clean_url = "https://" + clean_url
-                    db["universities"][new_uni_name] = {"url": clean_url, "logo": "🌍"}
-                    save_db(db)
-                    st.success("✅ تمت الإضافة بنجاح! جاري التحديث...")
-                    time.sleep(1); st.rerun()
-                else:
-                    st.warning("⚠️ يرجى تعبئة جميع الحقول.")
-        st.session_state.moodle_url = "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass" # رابط احتياطي أثناء الإضافة
-    else:
-        st.session_state.moodle_url = universities[selected_uni]["url"]
-        st.markdown(f"**الرابط:** `{st.session_state.moodle_url}`")
-
-    st.markdown("---")
-
-    # ==========================================
-    # --- 3. تسجيل الدخول والمزامنة ---
-    # ==========================================
-    st.header("⚙️ المزامنة مع المودل")
-    uid = st.text_input("الرقم الجامعي", value=st.session_state.get("u_id", ""))
-    upass = st.text_input("كلمة المرور", type="password", value=st.session_state.get("u_pass", ""))
-
-    if st.button("🚀 Sync Now", use_container_width=True) and uid and upass:
-        with st.spinner(f"جاري الدخول لمودل ({selected_uni})..."):
-            # سحب رابط الجامعة المحددة وتمريره للسكربت
-            moodle_link = st.session_state.get("moodle_url", "https://sso.iugaza.edu.ps/saml/module.php/core/loginuserpass")
-            res = run_selenium_task(uid, upass, "timeline", base_url=moodle_link)
-            
-            if res and "courses" in res:
-                st.session_state.update({
-                    "u_id": uid, 
-                    "u_pass": upass, 
-                    "my_real_courses": res['courses'], 
-                    "user_schedule": res.get('timeline_list', []), 
-                    "student_name": res.get('student_name', 'مستخدم'), 
-                    "is_synced": True
-                })
-                st.success("✅ تم الربط بنجاح!"); time.sleep(1); st.rerun()
-            else: 
-                st.error("❌ فشلت المزامنة. تأكد من البيانات أو توافق رابط الجامعة.")
-
-    with st.expander("⚙️ الإعدادات المتقدمة"):
-        if st.button("🔴 تسجيل الخروج النهائي", use_container_width=True):
-            # 1. تفريغ الكوكي بدلاً من حذفه (هذه الطريقة مدعومة في كل المتصفحات)
-            cookies["username"] = ""
-            cookies.save()
-            
-            # 2. مسح كل الجلسة (Session State)
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-                
-            st.session_state["is_logged_in"] = False
-            
-            # 3. استخدام جافاسكريبت يعمل ريفرش للمتصفح بعد ثانية واحدة 
-            # (هذا يعطي وقت لمكتبة الكوكيز لترسل أمر المسح للمتصفح)
-            st.components.v1.html(
-                """
-                <script>
-                setTimeout(function() {
-                    window.location.reload();
-                }, 1000);
-                </script>
-                """,
-                height=0
-            )
-            
-            st.warning("🔄 جاري تسجيل الخروج ومسح البيانات , الرجاء عمل ريفرش للصفحة للخروج...")
-            st.stop() # إيقاف الكود هنا لمنع أي تداخل
