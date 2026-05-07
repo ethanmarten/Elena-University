@@ -1,0 +1,12 @@
+name: Keep Elena Alive
+on:
+  schedule:
+    - cron: '*/15 * * * *' # يعمل كل 15 دقيقة
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Ping Streamlit App
+        run: curl -I https://elena-university.streamlit.app
